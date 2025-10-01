@@ -69,27 +69,18 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
           retention-days: 30
 
-      - name: List build outputs (debug)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          Write-Host "Listing target/release:"
-          Get-ChildItem src-tauri/target/release -Filter *.exe | Select-Object Name
-          Write-Host "`nListing target/release/bundle:"
-          Get-ChildItem src-tauri/target/release/bundle -Recurse -Filter *.exe | Select-Object FullName
-
       - name: Create portable Windows version
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path src-tauri/target/release/bundle/portable
-          # Copier depuis le bundle NSIS
-          $nsisExe = Get-ChildItem src-tauri/target/release/bundle/nsis -Filter *.exe | Select-Object -First 1
-          if ($nsisExe) {
-            Copy-Item $nsisExe.FullName src-tauri/target/release/bundle/portable/TVCalendar-Portable.exe
-            Write-Host "Portable version created from NSIS installer"
+          # L'exe principal est dans target/release et s'appelle généralement app.exe ou le productName
+          $exePath = "src-tauri/target/release/app.exe"
+          if (Test-Path $exePath) {
+            Copy-Item $exePath src-tauri/target/release/bundle/portable/TVCalendar-Portable.exe
+            Write-Host "Portable version created from app.exe"
           } else {
-            Write-Host "ERROR: No NSIS exe found"
+            Write-Host "ERROR: app.exe not found at $exePath"
             exit 1
           }
 
