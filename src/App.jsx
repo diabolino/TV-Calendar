@@ -43,13 +43,27 @@ const App = () => {
     }
   }, []);
 
-  // Sauvegarder dans localStorage
+  // Sauvegarder dans localStorage ET sync cloud si connecté
   useEffect(() => {
     localStorage.setItem('tv_calendar_shows', JSON.stringify(shows));
+
+    // Auto-sync vers Firebase si connecté
+    if (user && shows.length > 0) {
+      syncAllData(shows, watchedEpisodes).catch(err =>
+        console.error('Erreur auto-sync shows:', err)
+      );
+    }
   }, [shows]);
 
   useEffect(() => {
     localStorage.setItem('tv_calendar_watched', JSON.stringify(watchedEpisodes));
+
+    // Auto-sync vers Firebase si connecté
+    if (user && Object.keys(watchedEpisodes).length > 0) {
+      syncAllData(shows, watchedEpisodes).catch(err =>
+        console.error('Erreur auto-sync watched:', err)
+      );
+    }
   }, [watchedEpisodes]);
 
   // Charger le calendrier au démarrage et quand on ajoute/supprime une série
@@ -72,21 +86,47 @@ const App = () => {
         console.log('🔐 État auth:', firebaseUser ? 'Connecté' : 'Déconnecté');
         setUser(firebaseUser);
   
-        // Si l'utilisateur vient de se connecter, charger ses données cloud
+        // Si l'utilisateur vient de se connecter, fusionner intelligemment
         if (firebaseUser && !firebaseUser.isAnonymous) {
           const cloudData = await loadAllData();
-          
-          // Fusionner avec les données locales
-          if (cloudData.shows.length > 0 || Object.keys(cloudData.watchedEpisodes).length > 0) {
-            const confirmLoad = window.confirm(
-              `Données cloud trouvées:\n- ${cloudData.shows.length} séries\n- ${Object.values(cloudData.watchedEpisodes).filter(v => v).length} épisodes vus\n\nVoulez-vous charger ces données ?`
-            );
-            
-            if (confirmLoad) {
-              setShows(cloudData.shows);
-              setWatchedEpisodes(cloudData.watchedEpisodes);
-              console.log('✅ Données cloud chargées !');
+          const localShows = shows;
+          const localWatched = watchedEpisodes;
+
+          // Fusionner les séries (union par ID)
+          const mergedShows = [...localShows];
+          cloudData.shows.forEach(cloudShow => {
+            if (!mergedShows.find(s => s.id === cloudShow.id)) {
+              mergedShows.push(cloudShow);
             }
+          });
+
+          // Fusionner les épisodes vus (union des clés)
+          const mergedWatched = { ...localWatched, ...cloudData.watchedEpisodes };
+
+          const hasCloudData = cloudData.shows.length > 0 || Object.keys(cloudData.watchedEpisodes).length > 0;
+          const hasLocalData = localShows.length > 0 || Object.keys(localWatched).length > 0;
+
+          if (hasCloudData && hasLocalData && mergedShows.length > Math.max(localShows.length, cloudData.shows.length)) {
+            // Données dans les deux endroits ET différentes
+            const confirmMerge = window.confirm(
+              `Fusion des données:\n- Local: ${localShows.length} séries\n- Cloud: ${cloudData.shows.length} séries\n- Total après fusion: ${mergedShows.length} séries\n\nFusionner les données ?`
+            );
+
+            if (confirmMerge) {
+              setShows(mergedShows);
+              setWatchedEpisodes(mergedWatched);
+              await syncAllData(mergedShows, mergedWatched);
+              console.log('✅ Données fusionnées et synchronisées !');
+            }
+          } else if (hasCloudData && !hasLocalData) {
+            // Seulement cloud → charger automatiquement
+            setShows(cloudData.shows);
+            setWatchedEpisodes(cloudData.watchedEpisodes);
+            console.log('✅ Données cloud chargées automatiquement');
+          } else if (!hasCloudData && hasLocalData) {
+            // Seulement local → sync vers cloud automatiquement
+            await syncAllData(localShows, localWatched);
+            console.log('✅ Données locales synchronisées vers le cloud');
           }
         }
       });
