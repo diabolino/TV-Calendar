@@ -60,7 +60,10 @@
       ],
       "icon": "public/icon.png",
       "category": "public.app-category.entertainment",
-      "artifactName": "${productName}-${version}-macOS-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-macOS-${arch}.${ext}",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "dmg": {
       "artifactName": "${productName}-${version}-macOS-${arch}.dmg"
