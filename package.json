@@ -1,6 +1,6 @@
 {
   "name": "tv-calendar",
-  "version": "1.9.0",
+  "version": "1.9.3",
   "description": "Application de calendrier TV moderne",
   "main": "electron.js",
   "scripts": {
