@@ -74,7 +74,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path src-tauri/target/release/bundle/portable
-          Copy-Item src-tauri/target/release/tv-calendar.exe src-tauri/target/release/bundle/portable/TVCalendar-Portable.exe
+          # Le fichier exe porte le nom du productName (TVCalendar.exe)
+          Copy-Item src-tauri/target/release/TVCalendar.exe src-tauri/target/release/bundle/portable/TVCalendar-Portable.exe
 
       - name: Upload artifacts (Windows)
         if: matrix.os == 'windows-latest'
