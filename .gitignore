@@ -8,6 +8,8 @@ dist/
 release/
 out/
 build/
+src-tauri/target/
+src-tauri/Cargo.lock
 
 # Development
 .vite/
