@@ -12,7 +12,7 @@
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win --x64",
     "dist:win32": "npm run build && electron-builder --win --ia32",
-    "dist:mac": "npm run build && electron-builder --mac --arm64 --x64",
+    "dist:mac": "npm run build && electron-builder --mac --x64",
     "dist:mac-arm": "npm run build && electron-builder --mac --arm64",
     "dist:mac-intel": "npm run build && electron-builder --mac --x64",
     "dist:linux": "npm run build && electron-builder --linux",
@@ -55,12 +55,8 @@
     "mac": {
       "target": [
         {
-          "target": "zip",
-          "arch": ["arm64", "x64"]
-        },
-        {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": ["x64"]
         }
       ],
       "icon": "public/icon.png",
