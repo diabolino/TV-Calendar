@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "TVCalendar",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "identifier": "com.tvcalendar",
   "build": {
     "frontendDist": "../dist",
@@ -35,6 +35,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "installMode": "perMachine",
+        "languages": ["French", "English"],
+        "displayLanguageSelector": true
+      }
+    },
     "macOS": {
       "entitlements": null,
       "exceptionDomain": "",
