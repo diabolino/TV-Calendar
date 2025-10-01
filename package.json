@@ -64,18 +64,13 @@
       ],
       "icon": "public/icon.png",
       "category": "public.app-category.entertainment",
-      "artifactName": "${productName}-${version}-macOS-${arch}.${ext}",
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "type": "distribution"
     },
     "dmg": {
-      "artifactName": "${productName}-${version}-macOS-${arch}.dmg",
       "sign": false
-    },
-    "zip": {
-      "artifactName": "${productName}-${version}-macOS-${arch}.zip"
     },
     "linux": {
       "target": [
