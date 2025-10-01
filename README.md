@@ -23,9 +23,11 @@ Application de calendrier TV moderne et légère, construite avec **Tauri** + Re
 
 Téléchargez la dernière version depuis [Releases](https://github.com/diabolino/TV-Calendar/releases)
 
-- **Windows** : `.exe` (installer NSIS ou portable)
-- **macOS** : `.dmg`
+- **Windows** : `.exe` (installer NSIS) ou `.msi` - [📖 Guide d'installation](WINDOWS_INSTALL.md)
+- **macOS** : `.dmg` - [📖 Guide d'installation](MACOS_INSTALL.md)
 - **Linux** : `.AppImage` ou `.deb`
+
+> ⚠️ **Note** : L'application n'est pas signée numériquement. Windows et macOS afficheront un avertissement de sécurité (c'est normal). Consultez les guides d'installation ci-dessus.
 
 ## 🛠️ Développement
 
