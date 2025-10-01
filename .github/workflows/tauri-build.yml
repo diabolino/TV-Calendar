@@ -110,7 +110,6 @@ jobs:
           name: tauri-${{ matrix.platform }}
           path: |
             src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app
           retention-days: 30
 
   release:
