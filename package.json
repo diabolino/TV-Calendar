@@ -54,6 +54,10 @@
     "mac": {
       "target": [
         {
+          "target": "zip",
+          "arch": ["arm64", "x64"]
+        },
+        {
           "target": "dmg",
           "arch": ["arm64", "x64"]
         }
@@ -63,10 +67,15 @@
       "artifactName": "${productName}-${version}-macOS-${arch}.${ext}",
       "identity": null,
       "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "type": "distribution"
     },
     "dmg": {
-      "artifactName": "${productName}-${version}-macOS-${arch}.dmg"
+      "artifactName": "${productName}-${version}-macOS-${arch}.dmg",
+      "sign": false
+    },
+    "zip": {
+      "artifactName": "${productName}-${version}-macOS-${arch}.zip"
     },
     "linux": {
       "target": [

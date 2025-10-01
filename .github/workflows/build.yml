@@ -27,7 +27,7 @@ jobs:
             artifact: '*.exe'
           - os: macos-latest
             platform: macos
-            artifact: '*.dmg'
+            artifact: '*.{dmg,zip}'
 
     steps:
       - name: Checkout code
