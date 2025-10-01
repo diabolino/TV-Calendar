@@ -20,7 +20,8 @@
   },
   "build": {
     "appId": "com.tvcalendar.app",
-    "productName": "TV Calendar",
+    "productName": "TVCalendar",
+    "publish": null,
     "directories": {
       "output": "release"
     },
