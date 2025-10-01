@@ -225,10 +225,11 @@ const App = () => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-    
+    // getDay() retourne 0-6 (Dim-Sam), on convertit pour avoir Lun=0, Dim=6
+    const startingDayOfWeek = (firstDay.getDay() + 6) % 7;
+
     const days = [];
-    
+
     const prevMonthLastDay = new Date(year, month, 0).getDate();
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
       const day = prevMonthLastDay - i;
