@@ -73,3 +73,4 @@ service-account.json
 # Claude Code artifacts
 .specstory/
 .claude/
+image.png

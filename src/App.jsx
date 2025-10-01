@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, Download } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
 import AuthAndBackup from './components/AuthAndBackup';
+import UpdateNotification from './components/UpdateNotification';
 import { 
   onAuthChange, 
   signIn,        // ← NOUVEAU
@@ -1014,6 +1015,9 @@ const App = () => {
           </div>
         </div>
       )}
+
+      {/* Update Notification */}
+      <UpdateNotification />
     </div>
   );
 };
