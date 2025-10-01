@@ -103,6 +103,16 @@ jobs:
             src-tauri/target/release/bundle/portable/*.exe
           retention-days: 30
 
+      - name: List macOS build outputs
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "=== Listing bundle directory ==="
+          ls -lah src-tauri/target/release/bundle/ || echo "bundle/ not found"
+          echo "=== Listing dmg directory ==="
+          ls -lah src-tauri/target/release/bundle/dmg/ || echo "dmg/ not found"
+          echo "=== Finding all DMG files ==="
+          find src-tauri/target/release/bundle -name "*.dmg" -type f || echo "No DMG found"
+
       - name: Upload artifacts (macOS)
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
