@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, Download, Play, Clock } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
-import { getShowOverviewFR, getEpisodeOverviewFR } from './services/tmdb';
+import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast } from './services/tmdb';
 import AuthAndBackup from './components/AuthAndBackup';
 import UpdateNotification from './components/UpdateNotification';
 import CachedImage from './components/CachedImage';
@@ -40,9 +40,17 @@ const App = () => {
   useEffect(() => {
     const savedShows = localStorage.getItem('tv_calendar_shows');
     const savedWatched = localStorage.getItem('tv_calendar_watched');
-    
+
     if (savedShows) {
-      setShows(JSON.parse(savedShows));
+      const parsedShows = JSON.parse(savedShows);
+      // Migration : limiter le cast à 5 acteurs
+      const migratedShows = parsedShows.map(show => {
+        if (show.cast && show.cast.length > 5) {
+          return { ...show, cast: show.cast.slice(0, 5) };
+        }
+        return show;
+      });
+      setShows(migratedShows);
     }
     if (savedWatched) {
       setWatchedEpisodes(JSON.parse(savedWatched));
@@ -274,8 +282,13 @@ const App = () => {
       return;
     }
 
-    // Enrichir avec TMDB pour synopsis français
+    // Enrichir avec TMDB pour synopsis français et cast
     const tmdbData = await getShowOverviewFR(show.title, show.imdbId);
+
+    let cast = [];
+    if (tmdbData?.tmdbId) {
+      cast = await getShowCast(tmdbData.tmdbId);
+    }
 
     const newShow = {
       ...show,
@@ -285,7 +298,8 @@ const App = () => {
       // Ajouter les données TMDB si disponibles
       overviewFR: tmdbData?.overview || show.overview,
       tmdbId: tmdbData?.tmdbId || null,
-      backgroundTMDB: tmdbData?.backdrop || null
+      backgroundTMDB: tmdbData?.backdrop || null,
+      cast: cast
     };
 
     setShows([...shows, newShow]);
@@ -433,18 +447,22 @@ const App = () => {
     setShowAllFutureEpisodes(false); // Réinitialiser
     setShowAllPastEpisodes(false);
 
-    // Si pas de synopsis français, essayer de le récupérer
+    // Si pas de synopsis français ou cast, essayer de les récupérer
     if (!show.overviewFR && !show.tmdbId) {
-      console.log('📡 Récupération synopsis FR pour:', show.title);
+      console.log('📡 Récupération données TMDB pour:', show.title);
       const tmdbData = await getShowOverviewFR(show.title, show.imdbId);
 
-      if (tmdbData) {
+      if (tmdbData && tmdbData.tmdbId) {
+        // Récupérer aussi le cast
+        const cast = await getShowCast(tmdbData.tmdbId);
+
         // Mettre à jour la série avec les données TMDB
         const updatedShow = {
           ...show,
           overviewFR: tmdbData.overview,
           tmdbId: tmdbData.tmdbId,
-          backgroundTMDB: tmdbData.backdrop
+          backgroundTMDB: tmdbData.backdrop,
+          cast: cast
         };
 
         // Mettre à jour dans la liste des séries
@@ -456,10 +474,27 @@ const App = () => {
         // Mettre à jour la modal
         setSelectedShowDetail(updatedShow);
 
-        console.log('✅ Synopsis FR récupéré pour:', show.title);
+        console.log('✅ Données TMDB récupérées pour:', show.title);
       } else {
-        console.log('⚠️ Pas de synopsis FR trouvé pour:', show.title);
+        console.log('⚠️ Pas de données TMDB trouvées pour:', show.title);
       }
+    } else if (show.tmdbId && !show.cast) {
+      // Si on a le tmdbId mais pas le cast, le récupérer
+      console.log('📡 Récupération cast pour:', show.title);
+      const cast = await getShowCast(show.tmdbId);
+
+      const updatedShow = {
+        ...show,
+        cast: cast
+      };
+
+      const updatedShows = shows.map(s =>
+        s.id === show.id ? updatedShow : s
+      );
+      setShows(updatedShows);
+      setSelectedShowDetail(updatedShow);
+
+      console.log('✅ Cast récupéré pour:', show.title);
     }
   };
 
@@ -1307,6 +1342,29 @@ const App = () => {
                   <p className="text-gray-300 leading-relaxed">
                     {selectedShowDetail.overviewFR || selectedShowDetail.overview}
                   </p>
+                </div>
+              )}
+
+              {/* Acteurs principaux */}
+              {selectedShowDetail.cast && selectedShowDetail.cast.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold mb-4 text-purple-400">Acteurs principaux</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {selectedShowDetail.cast.map(actor => (
+                      <div key={actor.id} className="bg-white/5 rounded-xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all">
+                        <CachedImage
+                          src={actor.profilePath || 'https://via.placeholder.com/185x278/1a1a1a/ffffff?text=No+Photo'}
+                          alt={actor.name}
+                          className="w-full aspect-[2/3] object-cover"
+                          fallback="https://via.placeholder.com/185x278/1a1a1a/ffffff?text=No+Photo"
+                        />
+                        <div className="p-3">
+                          <p className="font-bold text-sm truncate">{actor.name}</p>
+                          <p className="text-xs text-gray-400 truncate">{actor.character}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

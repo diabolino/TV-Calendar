@@ -157,11 +157,37 @@ export const getEpisodeOverviewFR = async (tmdbShowId, season, episode) => {
   }
 };
 
+/**
+ * Obtenir le casting d'une série (acteurs principaux)
+ */
+export const getShowCast = async (tmdbShowId) => {
+  try {
+    const response = await tmdbApi.get(`/tv/${tmdbShowId}/credits`);
+
+    // Retourner les 5 premiers acteurs principaux
+    const cast = response.data.cast.slice(0, 5).map(actor => ({
+      id: actor.id,
+      name: actor.name,
+      character: actor.character,
+      profilePath: actor.profile_path
+        ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
+        : null,
+      order: actor.order
+    }));
+
+    return cast;
+  } catch (error) {
+    console.error('❌ Erreur récupération cast:', error.message);
+    return [];
+  }
+};
+
 export default {
   searchShowTMDB,
   getShowDetailsTMDB,
   getEpisodeDetailsTMDB,
   findShowByIMDB,
   getShowOverviewFR,
-  getEpisodeOverviewFR
+  getEpisodeOverviewFR,
+  getShowCast
 };
