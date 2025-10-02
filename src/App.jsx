@@ -353,7 +353,16 @@ const App = () => {
       const data = await response.json();
       const latestVersion = data.tag_name.replace('v', ''); // Enlever le "v" du tag
 
-      if (latestVersion > currentVersion) {
+      // Comparer les versions correctement (ex: 2.4.1 vs 2.4.0)
+      const parseVersion = (v) => v.split('.').map(n => parseInt(n));
+      const [latestMajor, latestMinor, latestPatch] = parseVersion(latestVersion);
+      const [currentMajor, currentMinor, currentPatch] = parseVersion(currentVersion);
+
+      const isNewer = latestMajor > currentMajor ||
+                      (latestMajor === currentMajor && latestMinor > currentMinor) ||
+                      (latestMajor === currentMajor && latestMinor === currentMinor && latestPatch > currentPatch);
+
+      if (isNewer) {
         if (confirm(`Une nouvelle version ${latestVersion} est disponible ! (Version actuelle: ${currentVersion})\n\nVoulez-vous ouvrir la page de téléchargement ?`)) {
           window.open(data.html_url, '_blank');
         }
