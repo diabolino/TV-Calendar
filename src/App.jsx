@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, Download, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays } from 'lucide-react';
+import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast } from './services/tmdb';
 import { useTheme } from './contexts/ThemeContext';
@@ -9,6 +9,7 @@ import UpdateNotification from './components/UpdateNotification';
 import Dashboard from './components/Dashboard';
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp';
 import CachedImage from './components/CachedImage';
+import ShowCard from './components/ShowCard';
 import {
   onAuthChange,
   signIn,        // ← NOUVEAU
@@ -846,7 +847,13 @@ const App = () => {
 
   const monthName = currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const days = getDaysInMonth(currentDate);
-  const groupedEpisodes = groupByDate(calendar);
+
+  // Filtrer les épisodes du mois courant pour la vue liste
+  const currentMonthEpisodes = calendar.filter(ep => {
+    const epDate = new Date(ep.airDate);
+    return epDate.getMonth() === currentDate.getMonth() && epDate.getFullYear() === currentDate.getFullYear();
+  });
+  const groupedEpisodes = groupByDate(currentMonthEpisodes);
   const sortedDates = Object.keys(groupedEpisodes).sort();
 
   // Raccourcis clavier
@@ -1066,8 +1073,8 @@ const App = () => {
                   </button>
                   <h2 className="text-2xl font-bold capitalize ml-4">{monthName}</h2>
 
-                  <button onClick={handleRefresh} disabled={loading} className="ml-4 p-2 bg-purple-600/20 hover:bg-purple-600/30 rounded-lg transition-all disabled:opacity-50" title="Rafraîchir">
-                    <Download className={`w-5 h-5 text-purple-400 ${loading ? 'animate-spin' : ''}`} />
+                  <button onClick={handleRefresh} disabled={loading} className="ml-4 p-2 bg-purple-600/20 hover:bg-purple-600/30 rounded-lg transition-all disabled:opacity-50" title="Rafraîchir le calendrier">
+                    <RefreshCw className={`w-5 h-5 text-purple-400 ${loading ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
 
@@ -1180,13 +1187,13 @@ const App = () => {
 
                   {/* Headers des jours */}
                   {getWeekDays(currentDate).map((day, index) => {
-                    const isToday = isToday(day);
+                    const isDayToday = isToday(day);
                     return (
-                      <div key={index} className={`text-center py-3 ${isToday ? 'bg-purple-500/20 dark:bg-purple-500/30 rounded-t-lg' : ''}`}>
-                        <div className={`font-semibold text-sm ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div key={index} className={`text-center py-3 ${isDayToday ? 'bg-purple-500/20 dark:bg-purple-500/30 rounded-t-lg' : ''}`}>
+                        <div className={`font-semibold text-sm ${isDayToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
                           {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][index]}
                         </div>
-                        <div className={`text-2xl font-bold ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-white'}`}>
+                        <div className={`text-2xl font-bold ${isDayToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-white'}`}>
                           {day.getDate()}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -1202,10 +1209,10 @@ const App = () => {
                   <div></div>
                   {getWeekDays(currentDate).map((day, dayIndex) => {
                     const dayEpisodes = getEpisodesForDate(day);
-                    const isToday = isToday(day);
+                    const isDayToday = isToday(day);
 
                     return (
-                      <div key={dayIndex} className={`min-h-[400px] bg-white dark:bg-white/5 rounded-lg border border-gray-300 dark:border-white/10 p-2 ${isToday ? 'ring-2 ring-purple-500' : ''}`}>
+                      <div key={dayIndex} className={`min-h-[400px] bg-white dark:bg-white/5 rounded-lg border border-gray-300 dark:border-white/10 p-2 ${isDayToday ? 'ring-2 ring-purple-500' : ''}`}>
                         <div className="space-y-2">
                           {dayEpisodes.length === 0 ? (
                             <div className="text-center text-gray-400 dark:text-gray-600 text-sm py-4">
@@ -1265,7 +1272,12 @@ const App = () => {
                           }`}>
                             <div className="flex gap-4 p-4">
                               <div className="relative flex-shrink-0">
-                                <img src={episode.image || 'https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image'} alt={episode.title} className={`w-48 h-28 rounded-lg object-cover ${isWatched ? 'opacity-50' : ''}`} />
+                                <CachedImage
+                                  src={episode.image || 'https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image'}
+                                  alt={episode.title}
+                                  className={`w-48 h-28 rounded-lg object-cover ${isWatched ? 'opacity-50' : ''}`}
+                                  fallback="https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image"
+                                />
                                 {isWatched && (
                                   <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="bg-green-500 rounded-full p-3"><Check className="w-8 h-8" /></div>
@@ -1557,56 +1569,17 @@ const App = () => {
                     return 0;
                   })
                   .map(show => {
-                  const stats = getShowStats(show.tvmazeId, show.quality);
-
-                  return (
-                    <div key={show.id} onClick={() => openShowDetails(show)} className="bg-white dark:bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border border-gray-300 dark:border-white/10 hover:border-purple-500/50 transition-all group cursor-pointer">
-                      <div className="relative">
-                        <img src={show.poster || 'https://via.placeholder.com/500x750/1a1a1a/ffffff?text=No+Image'} alt={show.title} className="w-full aspect-[2/3] object-cover" />
-
-                        {stats.nextEpisode && (
-                          <div className="absolute top-2 left-2 bg-cyan-500 text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
-                            <Play className="w-3 h-3" />
-                            S{String(stats.nextEpisode.season).padStart(2, '0')}E{String(stats.nextEpisode.episode).padStart(2, '0')}
-                          </div>
-                        )}
-
-                        <button onClick={(e) => { e.stopPropagation(); removeShow(show.id); }} className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-bold text-lg mb-2 truncate" title={show.title}>{show.title}</h3>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                            show.quality === '4K' ? 'bg-purple-600/20 text-purple-400' :
-                            show.quality === '1080p' ? 'bg-green-600/20 text-green-400' : 'bg-blue-600/20 text-blue-400'
-                          }`}>{show.quality}</span>
-                          {show.rating > 0 && (
-                            <div className="flex items-center gap-1 text-sm text-gray-400">
-                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                              <span>{show.rating.toFixed(1)}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {stats.totalEpisodes > 0 && (
-                          <div>
-                            <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-1.5 overflow-hidden mb-1">
-                              <div
-                                className="h-full bg-gradient-to-r from-purple-600 to-pink-600"
-                                style={{ width: `${stats.progress}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-xs text-gray-500 dark:text-gray-500">
-                              {stats.watchedCount}/{stats.totalEpisodes} • {stats.progress}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    const stats = getShowStats(show.tvmazeId, show.quality);
+                    return (
+                      <ShowCard
+                        key={show.id}
+                        show={show}
+                        stats={stats}
+                        onShowClick={openShowDetails}
+                        onRemoveShow={removeShow}
+                      />
+                    );
+                  })}
               </div>
             )}
           </div>

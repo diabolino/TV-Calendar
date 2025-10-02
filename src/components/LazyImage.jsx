@@ -1,11 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { useImageCache } from '../hooks/useImageCache';
 
-/**
- * Composant d'image avec cache offline et lazy loading
- */
-const CachedImage = ({ src, alt, className, fallback = null, ...props }) => {
-  const cachedSrc = useImageCache(src, fallback);
+const LazyImage = ({ src, alt, className, fallback = null }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const imgRef = useRef(null);
@@ -23,8 +18,7 @@ const CachedImage = ({ src, alt, className, fallback = null, ...props }) => {
         });
       },
       {
-        rootMargin: '100px', // Charger 100px avant que l'image soit visible
-        threshold: 0.01
+        rootMargin: '50px', // Charger 50px avant que l'image soit visible
       }
     );
 
@@ -36,21 +30,24 @@ const CachedImage = ({ src, alt, className, fallback = null, ...props }) => {
   }, []);
 
   return (
-    <div ref={imgRef} className={className} style={{ position: 'relative' }}>
+    <div ref={imgRef} className={className}>
       {isInView ? (
         <img
-          src={cachedSrc}
+          src={src}
           alt={alt}
           className={`${className} transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => setIsLoaded(true)}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-          {...props}
+          onError={(e) => {
+            if (fallback) {
+              e.target.src = fallback;
+            }
+          }}
         />
       ) : (
-        <div className={`${className} bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 animate-pulse`} />
+        <div className={`${className} bg-gray-200 dark:bg-gray-700 animate-pulse`} />
       )}
     </div>
   );
 };
 
-export default CachedImage;
+export default LazyImage;
