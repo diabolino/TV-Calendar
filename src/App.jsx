@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, Download, Play, Clock, Sun, Moon } from 'lucide-react';
+import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, Download, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast } from './services/tmdb';
 import { useTheme } from './contexts/ThemeContext';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import AuthAndBackup from './components/AuthAndBackup';
 import UpdateNotification from './components/UpdateNotification';
+import Dashboard from './components/Dashboard';
+import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp';
 import CachedImage from './components/CachedImage';
 import {
   onAuthChange,
@@ -27,7 +30,7 @@ const App = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('calendar');
-  const [calendarView, setCalendarView] = useState('month');
+  const [calendarView, setCalendarView] = useState('month'); // 'month', 'list', 'week'
   const [watchedEpisodes, setWatchedEpisodes] = useState({});
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedShowDetail, setSelectedShowDetail] = useState(null);
@@ -37,6 +40,11 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [showsSearchQuery, setShowsSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('added'); // 'added', 'progress', 'next', 'name'
+  const [filterQuality, setFilterQuality] = useState('all'); // 'all', '720p', '1080p', '4K'
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'watching', 'completed', 'upcoming'
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
   // Charger depuis localStorage
   useEffect(() => {
@@ -443,6 +451,49 @@ const App = () => {
       .sort((a, b) => new Date(a.airDate) - new Date(b.airDate));
   };
 
+  // Générer une couleur unique pour une série (basée sur l'ID)
+  const getShowColor = (showId) => {
+    const colors = [
+      'bg-red-500/80',
+      'bg-blue-500/80',
+      'bg-green-500/80',
+      'bg-yellow-500/80',
+      'bg-purple-500/80',
+      'bg-pink-500/80',
+      'bg-indigo-500/80',
+      'bg-orange-500/80',
+      'bg-cyan-500/80',
+      'bg-teal-500/80',
+      'bg-lime-500/80',
+      'bg-amber-500/80',
+    ];
+
+    // Utiliser un hash simple de l'ID pour choisir une couleur
+    const hash = showId.toString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
+  // Obtenir les jours de la semaine courante
+  const getWeekDays = (date) => {
+    const week = [];
+    const currentDate = new Date(date);
+
+    // Aller au lundi de la semaine
+    const dayOfWeek = currentDate.getDay();
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Si dimanche (0), reculer de 6 jours
+    currentDate.setDate(currentDate.getDate() + diff);
+    currentDate.setHours(0, 0, 0, 0);
+
+    // Ajouter 7 jours
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(currentDate);
+      day.setDate(currentDate.getDate() + i);
+      week.push(day);
+    }
+
+    return week;
+  };
+
   // Ouvrir détails avec enrichissement TMDB si nécessaire
   const openShowDetails = async (show) => {
     setSelectedShowDetail(show);
@@ -798,6 +849,40 @@ const App = () => {
   const groupedEpisodes = groupByDate(calendar);
   const sortedDates = Object.keys(groupedEpisodes).sort();
 
+  // Raccourcis clavier
+  useKeyboardShortcuts([
+    {
+      key: 'k',
+      ctrl: true,
+      action: () => {
+        const searchInput = document.querySelector('input[placeholder*="Rechercher une série"]');
+        if (searchInput) searchInput.focus();
+      }
+    },
+    { key: 'd', action: () => setView('dashboard') },
+    { key: 'c', action: () => setView('calendar') },
+    { key: 't', action: () => setView('towatch') },
+    { key: 's', action: () => setView('shows') },
+    {
+      key: 'r',
+      ctrl: true,
+      action: () => {
+        if (shows.length > 0) {
+          loadCalendar();
+        }
+      }
+    },
+    { key: '?', shift: true, action: () => setShowKeyboardHelp(true) },
+    {
+      key: 'Escape',
+      action: () => {
+        setSelectedShowDetail(null);
+        setSelectedDayEpisodes(null);
+        setShowKeyboardHelp(false);
+      }
+    }
+  ]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-white">
       {/* Header */}
@@ -834,6 +919,15 @@ const App = () => {
               />
 
               <button
+                onClick={() => setView('dashboard')}
+                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                  view === 'dashboard' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </button>
+              <button
                 onClick={() => setView('calendar')}
                 className={`px-4 py-2 rounded-lg transition-all ${
                   view === 'calendar' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
@@ -843,11 +937,16 @@ const App = () => {
               </button>
               <button
                 onClick={() => setView('towatch')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`px-4 py-2 rounded-lg transition-all relative ${
                   view === 'towatch' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
                 }`}
               >
                 À regarder
+                {getShowsToWatch().length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
+                    {getShowsToWatch().length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setView('shows')}
@@ -939,7 +1038,18 @@ const App = () => {
       </header>
 
       <main className="max-w-[2000px] mx-auto px-6 py-8">
-        {view === 'calendar' ? (
+        {view === 'dashboard' ? (
+          <Dashboard
+            shows={shows}
+            calendar={calendar}
+            watchedEpisodes={watchedEpisodes}
+            onShowClick={openShowDetails}
+            onEpisodeClick={(episode) => {
+              const dayEpisodes = calendar.filter(ep => ep.airDate === episode.airDate);
+              setSelectedDayEpisodes({ date: episode.airDate, episodes: dayEpisodes });
+            }}
+          />
+        ) : view === 'calendar' ? (
           <div className="space-y-6">
             {/* Navigation */}
             {shows.length > 0 && (
@@ -962,8 +1072,11 @@ const App = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <button onClick={() => setCalendarView('month')} className={`p-2 rounded-lg transition-all ${calendarView === 'month' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'}`} title="Vue calendrier">
+                  <button onClick={() => setCalendarView('month')} className={`p-2 rounded-lg transition-all ${calendarView === 'month' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'}`} title="Vue mois">
                     <Grid className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => setCalendarView('week')} className={`p-2 rounded-lg transition-all ${calendarView === 'week' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'}`} title="Vue semaine">
+                    <CalendarDays className="w-5 h-5" />
                   </button>
                   <button onClick={() => setCalendarView('list')} className={`p-2 rounded-lg transition-all ${calendarView === 'list' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'}`} title="Vue liste">
                     <List className="w-5 h-5" />
@@ -1015,13 +1128,14 @@ const App = () => {
                             const isWatched = watchedEpisodes[episode.id];
                             // Trouver la série correspondante pour obtenir l'affiche
                             const show = shows.find(s => s.tvmazeId === episode.showId && s.quality === episode.quality);
+                            const colorClass = getShowColor(episode.showId);
 
                             return (
                               <div
                                 key={episode.id}
                                 onClick={() => toggleWatched(episode.id)}
-                                className={`flex gap-2 p-1.5 rounded cursor-pointer transition-all bg-gray-100 dark:bg-gray-800/60 hover:bg-gray-200 dark:hover:bg-gray-700/80 border ${
-                                  isWatched ? 'border-green-500/50' : 'border-gray-300 dark:border-gray-700/50 hover:border-gray-400 dark:hover:border-gray-600'
+                                className={`flex gap-2 p-1.5 rounded cursor-pointer transition-all ${colorClass} hover:opacity-90 border-2 ${
+                                  isWatched ? 'border-green-500/50 opacity-60' : 'border-transparent'
                                 }`}
                               >
                                 <img
@@ -1030,10 +1144,10 @@ const App = () => {
                                   className={`w-10 h-14 rounded object-cover flex-shrink-0 ${isWatched ? 'opacity-60' : ''}`}
                                 />
                                 <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                  <div className="text-xs font-semibold truncate text-gray-900 dark:text-gray-200">
+                                  <div className="text-xs font-semibold truncate text-white">
                                     {episode.showTitle}
                                   </div>
-                                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                                  <div className="text-xs text-white/90">
                                     S{String(episode.season).padStart(2, '0')}E{String(episode.episode).padStart(2, '0')}
                                   </div>
                                   {isWatched && (
@@ -1050,6 +1164,82 @@ const App = () => {
                             >
                               +{dayEpisodes.length - 3} plus
                             </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : calendarView === 'week' ? (
+              <div className="bg-transparent">
+                {/* Vue semaine avec timeline */}
+                <div className="grid grid-cols-8 gap-1">
+                  {/* Colonne des heures */}
+                  <div className="text-xs text-gray-500 dark:text-gray-500 font-semibold"></div>
+
+                  {/* Headers des jours */}
+                  {getWeekDays(currentDate).map((day, index) => {
+                    const isToday = isToday(day);
+                    return (
+                      <div key={index} className={`text-center py-3 ${isToday ? 'bg-purple-500/20 dark:bg-purple-500/30 rounded-t-lg' : ''}`}>
+                        <div className={`font-semibold text-sm ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                          {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][index]}
+                        </div>
+                        <div className={`text-2xl font-bold ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-white'}`}>
+                          {day.getDate()}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {day.toLocaleDateString('fr-FR', { month: 'short' })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Grille des épisodes */}
+                <div className="grid grid-cols-8 gap-1 mt-2">
+                  <div></div>
+                  {getWeekDays(currentDate).map((day, dayIndex) => {
+                    const dayEpisodes = getEpisodesForDate(day);
+                    const isToday = isToday(day);
+
+                    return (
+                      <div key={dayIndex} className={`min-h-[400px] bg-white dark:bg-white/5 rounded-lg border border-gray-300 dark:border-white/10 p-2 ${isToday ? 'ring-2 ring-purple-500' : ''}`}>
+                        <div className="space-y-2">
+                          {dayEpisodes.length === 0 ? (
+                            <div className="text-center text-gray-400 dark:text-gray-600 text-sm py-4">
+                              Aucun épisode
+                            </div>
+                          ) : (
+                            dayEpisodes.map(episode => {
+                              const isWatched = watchedEpisodes[episode.id];
+                              const show = shows.find(s => s.tvmazeId === episode.showId && s.quality === episode.quality);
+                              const colorClass = getShowColor(episode.showId);
+
+                              return (
+                                <div
+                                  key={episode.id}
+                                  onClick={() => toggleWatched(episode.id)}
+                                  className={`p-2 rounded-lg cursor-pointer transition-all ${colorClass} ${
+                                    isWatched ? 'opacity-50 line-through' : 'hover:scale-105'
+                                  } border-2 ${isWatched ? 'border-green-500' : 'border-transparent'}`}
+                                  title={`${episode.showTitle} - ${episode.title}`}
+                                >
+                                  <div className="text-white">
+                                    <div className="font-bold text-xs truncate">{episode.showTitle}</div>
+                                    <div className="text-[10px] opacity-90">
+                                      S{String(episode.season).padStart(2, '0')}E{String(episode.episode).padStart(2, '0')}
+                                    </div>
+                                    {show && (
+                                      <div className="text-[9px] opacity-75 mt-1">
+                                        {show.quality}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
                           )}
                         </div>
                       </div>
@@ -1246,6 +1436,77 @@ const App = () => {
               {shows.length > 0 && <span className="text-gray-600 dark:text-gray-400">{shows.length} série{shows.length > 1 ? 's' : ''}</span>}
             </div>
 
+            {/* Barre de recherche et filtres */}
+            {shows.length > 0 && (
+              <div className="bg-white dark:bg-white/5 rounded-2xl p-4 border border-gray-300 dark:border-white/10 space-y-4">
+                {/* Recherche */}
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={showsSearchQuery}
+                    onChange={(e) => setShowsSearchQuery(e.target.value)}
+                    placeholder="Rechercher dans mes séries..."
+                    className="w-full bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl pl-12 pr-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                {/* Filtres et tri */}
+                <div className="flex flex-wrap gap-3">
+                  {/* Tri */}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-4 py-2 bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="added">➕ Date d'ajout</option>
+                    <option value="name">🔤 Nom (A-Z)</option>
+                    <option value="progress">📊 Progression</option>
+                    <option value="next">📅 Prochain épisode</option>
+                  </select>
+
+                  {/* Filtre qualité */}
+                  <select
+                    value={filterQuality}
+                    onChange={(e) => setFilterQuality(e.target.value)}
+                    className="px-4 py-2 bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">Toutes qualités</option>
+                    <option value="720p">720p</option>
+                    <option value="1080p">1080p</option>
+                    <option value="4K">4K</option>
+                  </select>
+
+                  {/* Filtre statut */}
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-4 py-2 bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">Tous statuts</option>
+                    <option value="watching">En cours</option>
+                    <option value="completed">Terminées</option>
+                    <option value="upcoming">À venir</option>
+                  </select>
+
+                  {/* Reset */}
+                  {(showsSearchQuery || sortBy !== 'added' || filterQuality !== 'all' || filterStatus !== 'all') && (
+                    <button
+                      onClick={() => {
+                        setShowsSearchQuery('');
+                        setSortBy('added');
+                        setFilterQuality('all');
+                        setFilterStatus('all');
+                      }}
+                      className="px-4 py-2 bg-red-500/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/30 transition-all font-semibold"
+                    >
+                      ✕ Réinitialiser
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {shows.length === 0 ? (
               <div className="text-center py-12 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-300 dark:border-white/10">
                 <Plus className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
@@ -1254,7 +1515,48 @@ const App = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-8 gap-4">
-                {shows.map(show => {
+                {shows
+                  .filter(show => {
+                    // Filtre recherche
+                    if (showsSearchQuery && !show.title.toLowerCase().includes(showsSearchQuery.toLowerCase())) {
+                      return false;
+                    }
+                    // Filtre qualité
+                    if (filterQuality !== 'all' && show.quality !== filterQuality) {
+                      return false;
+                    }
+                    // Filtre statut
+                    if (filterStatus !== 'all') {
+                      const stats = getShowStats(show.tvmazeId, show.quality);
+                      if (filterStatus === 'completed' && stats.progress !== 100) return false;
+                      if (filterStatus === 'watching' && (stats.progress === 0 || stats.progress === 100)) return false;
+                      if (filterStatus === 'upcoming' && stats.progress !== 0) return false;
+                    }
+                    return true;
+                  })
+                  .sort((a, b) => {
+                    if (sortBy === 'added') {
+                      return new Date(b.addedAt) - new Date(a.addedAt);
+                    }
+                    if (sortBy === 'name') {
+                      return a.title.localeCompare(b.title);
+                    }
+                    if (sortBy === 'progress') {
+                      const statsA = getShowStats(a.tvmazeId, a.quality);
+                      const statsB = getShowStats(b.tvmazeId, b.quality);
+                      return statsB.progress - statsA.progress;
+                    }
+                    if (sortBy === 'next') {
+                      const statsA = getShowStats(a.tvmazeId, a.quality);
+                      const statsB = getShowStats(b.tvmazeId, b.quality);
+                      if (!statsA.nextEpisode && !statsB.nextEpisode) return 0;
+                      if (!statsA.nextEpisode) return 1;
+                      if (!statsB.nextEpisode) return -1;
+                      return new Date(statsA.nextEpisode.airDate) - new Date(statsB.nextEpisode.airDate);
+                    }
+                    return 0;
+                  })
+                  .map(show => {
                   const stats = getShowStats(show.tvmazeId, show.quality);
 
                   return (
@@ -1599,6 +1901,21 @@ const App = () => {
 
       {/* Update Notification */}
       <UpdateNotification />
+
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsHelp
+        isOpen={showKeyboardHelp}
+        onClose={() => setShowKeyboardHelp(false)}
+      />
+
+      {/* Floating help button */}
+      <button
+        onClick={() => setShowKeyboardHelp(true)}
+        className="fixed bottom-6 right-6 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-full shadow-2xl transition-all transform hover:scale-110 z-50"
+        title="Raccourcis clavier (Shift + ?)"
+      >
+        <span className="text-2xl font-bold">?</span>
+      </button>
     </div>
   );
 };
