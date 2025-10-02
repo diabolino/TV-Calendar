@@ -7,27 +7,41 @@ const tvmazeApi = axios.create({
   baseURL: TVMAZE_BASE_URL
 });
 
-// Rechercher des séries
+// Rechercher des séries avec images
 export const searchShows = async (query) => {
   try {
     console.log('🔍 Recherche TVMaze:', query);
     const response = await tvmazeApi.get('/search/shows', {
-      params: { q: query }
+      params: {
+        q: query,
+        embed: 'images' // Embarquer les images pour éviter des appels séparés
+      }
     });
     console.log('✅ Résultats TVMaze:', response.data.length, 'séries trouvées');
-    
-    return response.data.map(item => ({
-      id: item.show.id,
-      tvmazeId: item.show.id,
-      title: item.show.name,
-      year: item.show.premiered ? new Date(item.show.premiered).getFullYear() : null,
-      rating: item.show.rating?.average || 0,
-      overview: item.show.summary ? item.show.summary.replace(/<[^>]*>/g, '') : '',
-      poster: item.show.image?.original || item.show.image?.medium || null,
-      genres: item.show.genres || [],
-      status: item.show.status,
-      network: item.show.network?.name || item.show.webChannel?.name || 'N/A'
-    }));
+
+    return response.data.map(item => {
+      const show = item.show;
+      const images = show._embedded?.images || [];
+
+      // Trouver le background image
+      const backgroundImage = images.find(img => img.type === 'background');
+      const posterImage = images.find(img => img.type === 'poster');
+
+      return {
+        id: show.id,
+        tvmazeId: show.id,
+        title: show.name,
+        year: show.premiered ? new Date(show.premiered).getFullYear() : null,
+        rating: show.rating?.average || 0,
+        overview: show.summary ? show.summary.replace(/<[^>]*>/g, '') : '',
+        poster: posterImage?.resolutions?.original?.url || show.image?.original || show.image?.medium || null,
+        background: backgroundImage?.resolutions?.original?.url || null,
+        genres: show.genres || [],
+        status: show.status,
+        network: show.network?.name || show.webChannel?.name || 'N/A',
+        imdbId: show.externals?.imdb || null
+      };
+    });
   } catch (error) {
     console.error('❌ Erreur recherche TVMaze:', error.message);
     return [];
@@ -122,12 +136,21 @@ export const getFullSchedule = async (date = null) => {
   }
 };
 
-// Obtenir les détails d'une série
+// Obtenir les détails d'une série avec images
 export const getShowDetails = async (showId) => {
   try {
-    const response = await tvmazeApi.get(`/shows/${showId}`);
+    const response = await tvmazeApi.get(`/shows/${showId}`, {
+      params: {
+        embed: 'images' // Embarquer les images
+      }
+    });
     const show = response.data;
-    
+    const images = show._embedded?.images || [];
+
+    // Trouver les différents types d'images
+    const backgroundImage = images.find(img => img.type === 'background');
+    const posterImage = images.find(img => img.type === 'poster');
+
     return {
       id: show.id,
       tvmazeId: show.id,
@@ -135,13 +158,15 @@ export const getShowDetails = async (showId) => {
       year: show.premiered ? new Date(show.premiered).getFullYear() : null,
       rating: show.rating?.average || 0,
       overview: show.summary ? show.summary.replace(/<[^>]*>/g, '') : '',
-      poster: show.image?.original || show.image?.medium || null,
+      poster: posterImage?.resolutions?.original?.url || show.image?.original || show.image?.medium || null,
+      background: backgroundImage?.resolutions?.original?.url || null,
       genres: show.genres || [],
       status: show.status,
       network: show.network?.name || show.webChannel?.name || 'N/A',
       language: show.language,
       premiered: show.premiered,
-      officialSite: show.officialSite
+      officialSite: show.officialSite,
+      imdbId: show.externals?.imdb || null
     };
   } catch (error) {
     console.error('❌ Erreur détails série:', error.message);

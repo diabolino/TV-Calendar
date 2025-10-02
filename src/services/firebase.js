@@ -18,14 +18,14 @@ import {
   enableIndexedDbPersistence 
 } from 'firebase/firestore';
 
-// ⚠️ REMPLACE PAR TA CONFIG FIREBASE
+// Configuration Firebase depuis les variables d'environnement
 const firebaseConfig = {
-  apiKey: "AIzaSyDgkm8iXb--uY-gRMNUZ2XvLGsUbRisBgU",
-  authDomain: "tv-calendar-92b95.firebaseapp.com",
-  projectId: "tv-calendar-92b95",
-  storageBucket: "tv-calendar-92b95.firebasestorage.app",
-  messagingSenderId: "282280478249",
-  appId: "1:282280478249:web:e2cf2b1dcb2adc3b497e38"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialiser Firebase

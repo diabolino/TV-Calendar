@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, Download, Play, Clock } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
+import { getShowOverviewFR, getEpisodeOverviewFR } from './services/tmdb';
 import AuthAndBackup from './components/AuthAndBackup';
 import UpdateNotification from './components/UpdateNotification';
+import CachedImage from './components/CachedImage';
 import {
   onAuthChange,
   signIn,        // ← NOUVEAU
@@ -13,6 +15,8 @@ import {
   initAuth
 } from './services/firebase';
 import { exportData, importData } from './services/exportImport';
+import { cleanExpiredImages } from './services/imageCache';
+import { processSyncQueue, addToSyncQueue, hasPendingSync, getPendingSyncCount } from './services/syncQueue';
 
 const App = () => {
   const [shows, setShows] = useState([]);
@@ -30,6 +34,7 @@ const App = () => {
   const [showAllPastEpisodes, setShowAllPastEpisodes] = useState(false); // Pour afficher tous les épisodes passés
   const [user, setUser] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
   // Charger depuis localStorage
   useEffect(() => {
@@ -48,22 +53,48 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem('tv_calendar_shows', JSON.stringify(shows));
 
-    // Auto-sync vers Firebase si connecté
+    // Auto-sync vers Firebase si connecté, sinon ajouter à la queue
     if (user && shows.length > 0) {
-      syncAllData(shows, watchedEpisodes).catch(err =>
-        console.error('Erreur auto-sync shows:', err)
-      );
+      syncAllData(shows, watchedEpisodes).catch(err => {
+        console.error('Erreur auto-sync shows:', err);
+        // Ajouter à la queue en cas d'échec
+        addToSyncQueue({
+          type: 'shows',
+          data: { shows, watchedEpisodes }
+        });
+        setPendingSyncCount(getPendingSyncCount());
+      });
+    } else if (shows.length > 0) {
+      // Pas connecté, ajouter à la queue pour sync future
+      addToSyncQueue({
+        type: 'shows',
+        data: { shows, watchedEpisodes }
+      });
+      setPendingSyncCount(getPendingSyncCount());
     }
   }, [shows]);
 
   useEffect(() => {
     localStorage.setItem('tv_calendar_watched', JSON.stringify(watchedEpisodes));
 
-    // Auto-sync vers Firebase si connecté
+    // Auto-sync vers Firebase si connecté, sinon ajouter à la queue
     if (user && Object.keys(watchedEpisodes).length > 0) {
-      syncAllData(shows, watchedEpisodes).catch(err =>
-        console.error('Erreur auto-sync watched:', err)
-      );
+      syncAllData(shows, watchedEpisodes).catch(err => {
+        console.error('Erreur auto-sync watched:', err);
+        // Ajouter à la queue en cas d'échec
+        addToSyncQueue({
+          type: 'watched',
+          data: { shows, watchedEpisodes }
+        });
+        setPendingSyncCount(getPendingSyncCount());
+      });
+    } else if (Object.keys(watchedEpisodes).length > 0) {
+      // Pas connecté, ajouter à la queue pour sync future
+      addToSyncQueue({
+        type: 'watched',
+        data: { shows, watchedEpisodes }
+      });
+      setPendingSyncCount(getPendingSyncCount());
     }
   }, [watchedEpisodes]);
 
@@ -76,6 +107,19 @@ const App = () => {
     }
   }, [shows]);
   
+  // Nettoyage du cache et initialisation au démarrage
+  useEffect(() => {
+    // Nettoyer les images expirées au démarrage
+    cleanExpiredImages().then(count => {
+      if (count > 0) {
+        console.log(`🧹 ${count} images expirées nettoyées`);
+      }
+    });
+
+    // Vérifier les syncs en attente
+    setPendingSyncCount(getPendingSyncCount());
+  }, []);
+
   // Observer l'authentification Firebase + Auto-connexion
   useEffect(() => {
     const initFirebase = async () => {
@@ -153,19 +197,41 @@ const App = () => {
       
       for (const show of shows) {
         console.log('📺 Chargement épisodes pour:', show.title, '(' + show.quality + ')');
-        const episodes = await getShowEpisodes(show.tvmazeId);
-        
-        // Filtrer uniquement l'année en cours
-        const currentYear = new Date().getFullYear();
-        const yearEpisodes = episodes.filter(ep => {
-          const epYear = new Date(ep.airDate).getFullYear();
-          return epYear === currentYear;
-        });
 
-        console.log('✅', yearEpisodes.length, 'épisodes trouvés pour', show.title);
+        // Vérifier le cache offline d'abord
+        const cacheKey = `episodes_${show.tvmazeId}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
+        const cacheMaxAge = 24 * 60 * 60 * 1000; // 24 heures
 
-        // Ajouter avec la qualité de la série
-        yearEpisodes.forEach(episode => {
+        let episodes = [];
+
+        // Utiliser le cache si disponible et récent
+        if (cachedData && cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < cacheMaxAge && !forceReload) {
+          episodes = JSON.parse(cachedData);
+          console.log('💾 Épisodes chargés depuis le cache pour', show.title);
+        } else {
+          // Sinon, charger depuis l'API
+          try {
+            episodes = await getShowEpisodes(show.tvmazeId);
+            // Sauvegarder dans le cache
+            localStorage.setItem(cacheKey, JSON.stringify(episodes));
+            localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
+            console.log('✅', episodes.length, 'épisodes récupérés et mis en cache pour', show.title);
+          } catch (error) {
+            // En cas d'erreur, utiliser le cache même expiré si disponible
+            if (cachedData) {
+              episodes = JSON.parse(cachedData);
+              console.log('⚠️ Utilisation du cache expiré (mode offline) pour', show.title);
+            } else {
+              console.error('❌ Impossible de charger les épisodes pour', show.title);
+              continue;
+            }
+          }
+        }
+
+        // Ajouter avec la qualité de la série (tous les épisodes, toutes saisons)
+        episodes.forEach(episode => {
           allEpisodes.push({
             ...episode,
             id: `${episode.showId}-${episode.season}-${episode.episode}-${show.quality}`,
@@ -208,17 +274,24 @@ const App = () => {
       return;
     }
 
+    // Enrichir avec TMDB pour synopsis français
+    const tmdbData = await getShowOverviewFR(show.title, show.imdbId);
+
     const newShow = {
       ...show,
       quality,
       id: `${show.tvmazeId}-${quality}`,
-      addedAt: new Date().toISOString()
+      addedAt: new Date().toISOString(),
+      // Ajouter les données TMDB si disponibles
+      overviewFR: tmdbData?.overview || show.overview,
+      tmdbId: tmdbData?.tmdbId || null,
+      backgroundTMDB: tmdbData?.backdrop || null
     };
-    
+
     setShows([...shows, newShow]);
     setSearchQuery('');
     setSearchResults([]);
-    
+
     console.log('🎬 Série ajoutée ! Le calendrier va se recharger...');
   };
 
@@ -354,11 +427,40 @@ const App = () => {
       .sort((a, b) => new Date(a.airDate) - new Date(b.airDate));
   };
 
-  // Ouvrir détails
-  const openShowDetails = (show) => {
+  // Ouvrir détails avec enrichissement TMDB si nécessaire
+  const openShowDetails = async (show) => {
     setSelectedShowDetail(show);
     setShowAllFutureEpisodes(false); // Réinitialiser
     setShowAllPastEpisodes(false);
+
+    // Si pas de synopsis français, essayer de le récupérer
+    if (!show.overviewFR && !show.tmdbId) {
+      console.log('📡 Récupération synopsis FR pour:', show.title);
+      const tmdbData = await getShowOverviewFR(show.title, show.imdbId);
+
+      if (tmdbData) {
+        // Mettre à jour la série avec les données TMDB
+        const updatedShow = {
+          ...show,
+          overviewFR: tmdbData.overview,
+          tmdbId: tmdbData.tmdbId,
+          backgroundTMDB: tmdbData.backdrop
+        };
+
+        // Mettre à jour dans la liste des séries
+        const updatedShows = shows.map(s =>
+          s.id === show.id ? updatedShow : s
+        );
+        setShows(updatedShows);
+
+        // Mettre à jour la modal
+        setSelectedShowDetail(updatedShow);
+
+        console.log('✅ Synopsis FR récupéré pour:', show.title);
+      } else {
+        console.log('⚠️ Pas de synopsis FR trouvé pour:', show.title);
+      }
+    }
   };
 
   const closeShowDetails = () => {
@@ -590,11 +692,29 @@ const App = () => {
       alert('⚠️ Connectez-vous d\'abord pour synchroniser');
       return;
     }
-  
+
     setIsSyncing(true);
+
+    // D'abord, synchroniser les données actuelles
     const success = await syncAllData(shows, watchedEpisodes);
+
+    // Ensuite, traiter la queue de sync en attente
+    if (hasPendingSync()) {
+      const queueResult = await processSyncQueue(async (data) => {
+        await syncAllData(data.shows, data.watchedEpisodes);
+      });
+
+      setPendingSyncCount(queueResult.remaining);
+
+      if (queueResult.success) {
+        console.log(`✅ ${queueResult.processed} opérations en attente synchronisées`);
+      } else {
+        console.log(`⚠️ ${queueResult.processed} synchronisées, ${queueResult.failed} échouées`);
+      }
+    }
+
     setIsSyncing(false);
-  
+
     if (success) {
       alert('✅ Données synchronisées sur le cloud !');
     } else {
@@ -969,10 +1089,11 @@ const App = () => {
                     <div key={show.id} className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all overflow-hidden">
                       <div className="flex gap-4 p-4">
                         <div className="relative flex-shrink-0 cursor-pointer" onClick={() => openShowDetails(show)}>
-                          <img
+                          <CachedImage
                             src={show.poster || 'https://via.placeholder.com/200x300/1a1a1a/ffffff?text=No+Image'}
                             alt={show.title}
                             className="w-32 h-48 rounded-lg object-cover"
+                            fallback="https://via.placeholder.com/200x300/1a1a1a/ffffff?text=No+Image"
                           />
                         </div>
 
@@ -1149,7 +1270,12 @@ const App = () => {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={closeShowDetails}>
           <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/20" onClick={(e) => e.stopPropagation()}>
             <div className="relative h-64 overflow-hidden rounded-t-3xl">
-              <img src={selectedShowDetail.poster || 'https://via.placeholder.com/1200x400/1a1a1a/ffffff?text=No+Image'} alt={selectedShowDetail.title} className="w-full h-full object-cover" />
+              <CachedImage
+                src={selectedShowDetail.backgroundTMDB || selectedShowDetail.background || selectedShowDetail.poster || 'https://via.placeholder.com/1200x400/1a1a1a/ffffff?text=No+Image'}
+                alt={selectedShowDetail.title}
+                className="w-full h-full object-cover"
+                fallback={selectedShowDetail.poster || 'https://via.placeholder.com/1200x400/1a1a1a/ffffff?text=No+Image'}
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"></div>
               
               <button onClick={closeShowDetails} className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all">
@@ -1175,110 +1301,136 @@ const App = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {selectedShowDetail.overview && (
+              {(selectedShowDetail.overviewFR || selectedShowDetail.overview) && (
                 <div>
                   <h3 className="text-xl font-bold mb-3 text-purple-400">Synopsis</h3>
-                  <p className="text-gray-300 leading-relaxed">{selectedShowDetail.overview}</p>
+                  <p className="text-gray-300 leading-relaxed">
+                    {selectedShowDetail.overviewFR || selectedShowDetail.overview}
+                  </p>
                 </div>
               )}
 
               <div>
-                <h3 className="text-xl font-bold mb-4 text-purple-400">Épisodes ({selectedShowDetail.quality})</h3>
+                <h3 className="text-xl font-bold mb-4 text-purple-400">Saisons ({selectedShowDetail.quality})</h3>
                 {(() => {
                   const showEpisodes = getShowEpisodesFiltered(selectedShowDetail.tvmazeId, selectedShowDetail.quality);
-                  const futureEpisodes = showEpisodes.filter(ep => !isPast(ep.airDate));
-                  const pastEpisodes = showEpisodes.filter(ep => isPast(ep.airDate)).reverse();
+
+                  // Grouper par saison
+                  const seasonGroups = {};
+                  showEpisodes.forEach(ep => {
+                    if (!seasonGroups[ep.season]) {
+                      seasonGroups[ep.season] = [];
+                    }
+                    seasonGroups[ep.season].push(ep);
+                  });
+
+                  const seasons = Object.keys(seasonGroups).map(Number).sort((a, b) => b - a);
+
+                  // Fonction pour marquer toute une saison
+                  const markSeasonAsWatched = (season, watched) => {
+                    const newWatched = { ...watchedEpisodes };
+                    seasonGroups[season].forEach(ep => {
+                      newWatched[ep.id] = watched;
+                    });
+                    setWatchedEpisodes(newWatched);
+                  };
 
                   return (
-                    <div className="space-y-6">
-                      {futureEpisodes.length > 0 && (
-                        <div>
-                          <h4 className="text-lg font-semibold mb-3 text-green-400">À venir ({futureEpisodes.length})</h4>
-                          <div className="space-y-3">
-                            {(showAllFutureEpisodes ? futureEpisodes : futureEpisodes.slice(0, 5)).map(episode => {
-                              const isWatched = watchedEpisodes[episode.id];
-                              return (
-                                <div key={episode.id} onClick={() => toggleWatched(episode.id)} className={`flex gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
-                                  isWatched ? 'bg-green-500/10 border-green-500/50' : 'bg-white/5 border-white/10 hover:border-purple-500/50'
-                                }`}>
-                                  <img src={episode.image || 'https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image'} alt={episode.title} className="w-32 h-20 rounded-lg object-cover" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between mb-1">
-                                      <h4 className="font-bold truncate">S{String(episode.season).padStart(2, '0')}E{String(episode.episode).padStart(2, '0')} - {episode.title}</h4>
-                                      {isWatched && <Check className="w-5 h-5 text-green-400 flex-shrink-0 ml-2" />}
+                    <div className="space-y-4">
+                      {seasons.map(season => {
+                        const episodes = seasonGroups[season];
+                        const watchedCount = episodes.filter(ep => watchedEpisodes[ep.id]).length;
+                        const totalCount = episodes.length;
+                        const progress = totalCount > 0 ? Math.round((watchedCount / totalCount) * 100) : 0;
+                        const allWatched = watchedCount === totalCount;
+
+                        return (
+                          <div key={season} className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+                            <div className="p-4 bg-white/5 border-b border-white/10">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <h4 className="text-lg font-bold mb-2">Saison {season}</h4>
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                      <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                                        <div
+                                          className="h-full bg-gradient-to-r from-purple-600 to-pink-600 transition-all"
+                                          style={{ width: `${progress}%` }}
+                                        ></div>
+                                      </div>
                                     </div>
-                                    <p className="text-sm text-gray-400 mb-2 line-clamp-2">{episode.overview}</p>
-                                    <span className="text-xs text-gray-500">📅 {episode.airDate}</span>
+                                    <span className="text-sm text-gray-400 whitespace-nowrap">
+                                      {watchedCount}/{totalCount} ({progress}%)
+                                    </span>
                                   </div>
                                 </div>
-                              );
-                            })}
-                            {futureEpisodes.length > 5 && !showAllFutureEpisodes && (
-                              <button 
-                                onClick={() => setShowAllFutureEpisodes(true)}
-                                className="w-full py-3 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-xl font-semibold transition-all"
-                              >
-                                Voir tous les {futureEpisodes.length} épisodes à venir
-                              </button>
-                            )}
-                            {futureEpisodes.length > 5 && showAllFutureEpisodes && (
-                              <button 
-                                onClick={() => setShowAllFutureEpisodes(false)}
-                                className="w-full py-3 bg-white/10 hover:bg-white/20 text-gray-300 rounded-xl font-semibold transition-all"
-                              >
-                                Afficher moins
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {pastEpisodes.length > 0 && (
-                        <div>
-                          <h4 className="text-lg font-semibold mb-3 text-gray-400">Récents ({pastEpisodes.length})</h4>
-                          <div className="space-y-3">
-                            {(showAllPastEpisodes ? pastEpisodes : pastEpisodes.slice(0, 5)).map(episode => {
-                              const isWatched = watchedEpisodes[episode.id];
-                              return (
-                                <div key={episode.id} onClick={() => toggleWatched(episode.id)} className={`flex gap-4 p-4 rounded-xl border cursor-pointer transition-all opacity-70 ${
-                                  isWatched ? 'bg-green-500/10 border-green-500/50' : 'bg-white/5 border-white/10 hover:border-purple-500/50'
-                                }`}>
-                                  <img src={episode.image || 'https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image'} alt={episode.title} className="w-32 h-20 rounded-lg object-cover" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between mb-1">
-                                      <h4 className="font-bold truncate">S{String(episode.season).padStart(2, '0')}E{String(episode.episode).padStart(2, '0')} - {episode.title}</h4>
-                                      {isWatched && <Check className="w-5 h-5 text-green-400 flex-shrink-0 ml-2" />}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markSeasonAsWatched(season, !allWatched);
+                                  }}
+                                  className={`ml-4 px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                                    allWatched
+                                      ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
+                                      : 'bg-purple-600/20 text-purple-400 hover:bg-purple-600/30'
+                                  }`}
+                                >
+                                  {allWatched ? (
+                                    <>
+                                      <Check className="w-4 h-4" />
+                                      Tout vu
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Check className="w-4 h-4" />
+                                      Marquer tout
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="p-4 space-y-2">
+                              {episodes.map(episode => {
+                                const isWatched = watchedEpisodes[episode.id];
+                                const isFuture = !isPast(episode.airDate);
+                                return (
+                                  <div
+                                    key={episode.id}
+                                    onClick={() => toggleWatched(episode.id)}
+                                    className={`flex gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                                      isWatched ? 'bg-green-500/10 border-green-500/50' : 'bg-white/5 border-white/10 hover:border-purple-500/50'
+                                    }`}
+                                  >
+                                    <img
+                                      src={episode.image || 'https://via.placeholder.com/160x90/2d3748/ffffff?text=No+Image'}
+                                      alt={episode.title}
+                                      className="w-28 h-16 rounded-lg object-cover flex-shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between mb-1">
+                                        <h5 className="font-bold text-sm truncate">
+                                          E{String(episode.episode).padStart(2, '0')} - {episode.title}
+                                        </h5>
+                                        {isWatched && <Check className="w-4 h-4 text-green-400 flex-shrink-0 ml-2" />}
+                                      </div>
+                                      <p className="text-xs text-gray-400 line-clamp-1">{episode.overview}</p>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-gray-500">📅 {episode.airDate}</span>
+                                        {isFuture && <span className="text-xs bg-green-600/20 text-green-400 px-2 py-0.5 rounded">À venir</span>}
+                                      </div>
                                     </div>
-                                    <p className="text-sm text-gray-400 mb-2 line-clamp-2">{episode.overview}</p>
-                                    <span className="text-xs text-gray-500">📅 {episode.airDate}</span>
                                   </div>
-                                </div>
-                              );
-                            })}
-                            {pastEpisodes.length > 5 && !showAllPastEpisodes && (
-                              <button 
-                                onClick={() => setShowAllPastEpisodes(true)}
-                                className="w-full py-3 bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 rounded-xl font-semibold transition-all"
-                              >
-                                Voir tous les {pastEpisodes.length} épisodes passés
-                              </button>
-                            )}
-                            {pastEpisodes.length > 5 && showAllPastEpisodes && (
-                              <button 
-                                onClick={() => setShowAllPastEpisodes(false)}
-                                className="w-full py-3 bg-white/10 hover:bg-white/20 text-gray-300 rounded-xl font-semibold transition-all"
-                              >
-                                Afficher moins
-                              </button>
-                            )}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })}
 
-                      {showEpisodes.length === 0 && (
+                      {seasons.length === 0 && (
                         <div className="text-center py-8 text-gray-400">
                           <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                          <p>Aucun épisode trouvé pour cette année</p>
+                          <p>Aucun épisode trouvé</p>
                         </div>
                       )}
                     </div>
