@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays } from 'lucide-react';
+import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast } from './services/tmdb';
 import { useTheme } from './contexts/ThemeContext';
@@ -22,9 +22,11 @@ import {
 import { exportData, importData } from './services/exportImport';
 import { cleanExpiredImages } from './services/imageCache';
 import { processSyncQueue, addToSyncQueue, hasPendingSync, getPendingSyncCount } from './services/syncQueue';
+import packageJson from '../package.json';
 
 const App = () => {
   const { theme, toggleTheme } = useTheme();
+  const currentVersion = packageJson.version;
   const [shows, setShows] = useState([]);
   const [calendar, setCalendar] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -342,6 +344,26 @@ const App = () => {
       return;
     }
     loadCalendar(true);
+  };
+
+  // Vérifier les mises à jour sur GitHub
+  const checkForUpdates = async () => {
+    try {
+      const response = await fetch('https://api.github.com/repos/diabolino/TV-Calendar/releases/latest');
+      const data = await response.json();
+      const latestVersion = data.tag_name.replace('v', ''); // Enlever le "v" du tag
+
+      if (latestVersion > currentVersion) {
+        if (confirm(`Une nouvelle version ${latestVersion} est disponible ! (Version actuelle: ${currentVersion})\n\nVoulez-vous ouvrir la page de téléchargement ?`)) {
+          window.open(data.html_url, '_blank');
+        }
+      } else {
+        alert(`Vous avez la dernière version (${currentVersion}) ! ✅`);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification des mises à jour:', error);
+      alert('Impossible de vérifier les mises à jour. Vérifiez votre connexion internet.');
+    }
   };
 
   // Navigation
@@ -898,10 +920,18 @@ const App = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Calendar className="w-8 h-8 text-purple-400" />
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                TV Calendar
-              </h1>
-              <span className="text-sm text-gray-400 ml-2">Powered by TVMaze</span>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  TV Calendar
+                </h1>
+                <button
+                  onClick={checkForUpdates}
+                  className="px-2 py-1 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-all text-xs font-bold cursor-pointer"
+                  title="Cliquez pour vérifier les mises à jour"
+                >
+                  v{currentVersion}
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -936,18 +966,20 @@ const App = () => {
               </button>
               <button
                 onClick={() => setView('calendar')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
                   view === 'calendar' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
                 }`}
               >
+                <Calendar className="w-4 h-4" />
                 Calendrier
               </button>
               <button
                 onClick={() => setView('towatch')}
-                className={`px-4 py-2 rounded-lg transition-all relative ${
+                className={`px-4 py-2 rounded-lg transition-all relative flex items-center gap-2 ${
                   view === 'towatch' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
                 }`}
               >
+                <Eye className="w-4 h-4" />
                 À regarder
                 {getShowsToWatch().length > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
@@ -957,11 +989,22 @@ const App = () => {
               </button>
               <button
                 onClick={() => setView('shows')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
                   view === 'shows' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
                 }`}
               >
+                <Tv className="w-4 h-4" />
                 Mes Séries ({shows.length})
+              </button>
+
+              {/* Aide - Raccourcis clavier */}
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 transition-all flex items-center gap-2"
+                title="Raccourcis clavier (Shift + ?)"
+              >
+                <span className="text-lg font-bold">?</span>
+                Aide
               </button>
             </div>
           </div>
@@ -1053,7 +1096,7 @@ const App = () => {
             onShowClick={openShowDetails}
             onEpisodeClick={(episode) => {
               const dayEpisodes = calendar.filter(ep => ep.airDate === episode.airDate);
-              setSelectedDayEpisodes({ date: episode.airDate, episodes: dayEpisodes });
+              setSelectedDayEpisodes({ date: new Date(episode.airDate), episodes: dayEpisodes });
             }}
           />
         ) : view === 'calendar' ? (
@@ -1121,7 +1164,7 @@ const App = () => {
                     return (
                       <div
                         key={index}
-                        className={`min-h-[200px] p-2 bg-white dark:bg-white/5 relative ${
+                        className={`min-h-[200px] p-2 bg-white dark:bg-white/5 rounded-lg border border-gray-300 dark:border-white/10 relative ${
                           !day.isCurrentMonth ? 'opacity-40' : ''
                         } ${
                           isCurrentDay ? 'ring-2 ring-purple-500' : ''
@@ -1145,10 +1188,11 @@ const App = () => {
                                   isWatched ? 'border-green-500/50 opacity-60' : 'border-transparent'
                                 }`}
                               >
-                                <img
-                                  src={show?.poster || episode.image || 'https://via.placeholder.com/40x60/1a1a1a/ffffff?text=?'}
+                                <CachedImage
+                                  src={show?.poster || 'https://via.placeholder.com/40x60/1a1a1a/ffffff?text=?'}
                                   alt={episode.showTitle}
                                   className={`w-10 h-14 rounded object-cover flex-shrink-0 ${isWatched ? 'opacity-60' : ''}`}
+                                  fallback="https://via.placeholder.com/40x60/1a1a1a/ffffff?text=?"
                                 />
                                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                                   <div className="text-xs font-semibold truncate text-white">
@@ -1228,22 +1272,39 @@ const App = () => {
                                 <div
                                   key={episode.id}
                                   onClick={() => toggleWatched(episode.id)}
-                                  className={`p-2 rounded-lg cursor-pointer transition-all ${colorClass} ${
-                                    isWatched ? 'opacity-50 line-through' : 'hover:scale-105'
-                                  } border-2 ${isWatched ? 'border-green-500' : 'border-transparent'}`}
+                                  className={`relative rounded-lg cursor-pointer transition-all overflow-hidden ${
+                                    isWatched ? 'opacity-50' : 'hover:scale-105'
+                                  } border-2 ${isWatched ? 'border-green-500' : 'border-transparent'} bg-white dark:bg-white/5`}
                                   title={`${episode.showTitle} - ${episode.title}`}
                                 >
-                                  <div className="text-white">
-                                    <div className="font-bold text-xs truncate">{episode.showTitle}</div>
-                                    <div className="text-[10px] opacity-90">
-                                      S{String(episode.season).padStart(2, '0')}E{String(episode.episode).padStart(2, '0')}
-                                    </div>
-                                    {show && (
-                                      <div className="text-[9px] opacity-75 mt-1">
-                                        {show.quality}
+                                  {show?.poster && (
+                                    <CachedImage
+                                      src={show.poster}
+                                      alt={episode.showTitle}
+                                      className="w-full aspect-[2/3] object-cover"
+                                      fallback="https://via.placeholder.com/200x300/1a1a1a/ffffff?text=No+Poster"
+                                    />
+                                  )}
+                                  <div className={`p-2 ${colorClass}`}>
+                                    <div className="text-white">
+                                      <div className="font-bold text-xs truncate">{episode.showTitle}</div>
+                                      <div className="text-[10px] opacity-90">
+                                        S{String(episode.season).padStart(2, '0')}E{String(episode.episode).padStart(2, '0')}
                                       </div>
-                                    )}
+                                      {show && (
+                                        <div className="text-[9px] opacity-75 mt-1">
+                                          {show.quality}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
+                                  {isWatched && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                                      <div className="bg-green-500 rounded-full p-2">
+                                        <Check className="w-4 h-4 text-white" />
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })
@@ -1266,6 +1327,7 @@ const App = () => {
                     <div className="grid gap-4">
                       {groupedEpisodes[date].map(episode => {
                         const isWatched = watchedEpisodes[episode.id];
+                        const show = shows.find(s => s.tvmazeId === episode.showId && s.quality === episode.quality);
                         return (
                           <div key={episode.id} onClick={() => toggleWatched(episode.id)} className={`bg-white dark:bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border transition-all cursor-pointer hover:scale-[1.02] ${
                             isWatched ? 'border-green-500/50 bg-green-500/10' : 'border-gray-300 dark:border-white/10 hover:border-purple-500/50'
@@ -1273,10 +1335,10 @@ const App = () => {
                             <div className="flex gap-4 p-4">
                               <div className="relative flex-shrink-0">
                                 <CachedImage
-                                  src={episode.image || 'https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image'}
-                                  alt={episode.title}
-                                  className={`w-48 h-28 rounded-lg object-cover ${isWatched ? 'opacity-50' : ''}`}
-                                  fallback="https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image"
+                                  src={show?.poster || 'https://via.placeholder.com/200x300/2d3748/ffffff?text=No+Poster'}
+                                  alt={episode.showTitle}
+                                  className={`w-32 aspect-[2/3] rounded-lg object-cover ${isWatched ? 'opacity-50' : ''}`}
+                                  fallback="https://via.placeholder.com/200x300/2d3748/ffffff?text=No+Poster"
                                 />
                                 {isWatched && (
                                   <div className="absolute inset-0 flex items-center justify-center">
@@ -1469,7 +1531,8 @@ const App = () => {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="px-4 py-2 bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="appearance-none px-4 py-2 pr-10 bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 dark:focus:border-purple-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer font-semibold shadow-none"
+                    style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
                   >
                     <option value="added">➕ Date d'ajout</option>
                     <option value="name">🔤 Nom (A-Z)</option>
@@ -1481,7 +1544,8 @@ const App = () => {
                   <select
                     value={filterQuality}
                     onChange={(e) => setFilterQuality(e.target.value)}
-                    className="px-4 py-2 bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="appearance-none px-4 py-2 pr-10 bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 dark:focus:border-purple-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer font-semibold shadow-none"
+                    style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
                   >
                     <option value="all">Toutes qualités</option>
                     <option value="720p">720p</option>
@@ -1493,7 +1557,8 @@ const App = () => {
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-4 py-2 bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="appearance-none px-4 py-2 pr-10 bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 dark:focus:border-purple-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer font-semibold shadow-none"
+                    style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
                   >
                     <option value="all">Tous statuts</option>
                     <option value="watching">En cours</option>
@@ -1809,6 +1874,7 @@ const App = () => {
             <div className="p-6 space-y-4">
               {selectedDayEpisodes.episodes.map(episode => {
                 const isWatched = watchedEpisodes[episode.id];
+                const show = shows.find(s => s.tvmazeId === episode.showId && s.quality === episode.quality);
                 return (
                   <div
                     key={episode.id}
@@ -1819,10 +1885,11 @@ const App = () => {
                   >
                     <div className="flex gap-4 p-4">
                       <div className="relative flex-shrink-0">
-                        <img
-                          src={episode.image || 'https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image'}
-                          alt={episode.title}
-                          className={`w-48 h-28 rounded-lg object-cover transition-opacity ${isWatched ? 'opacity-50' : ''}`}
+                        <CachedImage
+                          src={show?.poster || 'https://via.placeholder.com/200x300/2d3748/ffffff?text=No+Poster'}
+                          alt={episode.showTitle}
+                          className={`w-32 aspect-[2/3] rounded-lg object-cover transition-opacity ${isWatched ? 'opacity-50' : ''}`}
+                          fallback="https://via.placeholder.com/200x300/2d3748/ffffff?text=No+Poster"
                         />
                         {isWatched && (
                           <div className="absolute inset-0 flex items-center justify-center">
@@ -1881,14 +1948,12 @@ const App = () => {
         onClose={() => setShowKeyboardHelp(false)}
       />
 
-      {/* Floating help button */}
-      <button
-        onClick={() => setShowKeyboardHelp(true)}
-        className="fixed bottom-6 right-6 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-full shadow-2xl transition-all transform hover:scale-110 z-50"
-        title="Raccourcis clavier (Shift + ?)"
-      >
-        <span className="text-2xl font-bold">?</span>
-      </button>
+      {/* Footer */}
+      <footer className="py-6 text-center">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Powered by <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 transition-colors">TVMaze</a>
+        </p>
+      </footer>
     </div>
   );
 };

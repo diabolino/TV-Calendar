@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { TrendingUp, Clock, CheckCircle, Calendar, Play, Bell, Eye, Target } from 'lucide-react';
+import CachedImage from './CachedImage';
 
 const Dashboard = ({ shows, calendar, watchedEpisodes, onShowClick, onEpisodeClick }) => {
   // Calculer les statistiques
@@ -107,10 +108,11 @@ const Dashboard = ({ shows, calendar, watchedEpisodes, onShowClick, onEpisodeCli
         className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-300 dark:border-white/10 hover:border-purple-500 dark:hover:border-purple-500 transition-all cursor-pointer group"
       >
         <div className="flex gap-3">
-          <img
+          <CachedImage
             src={show?.poster || episode.image || 'https://via.placeholder.com/80x120/1a1a1a/ffffff?text=?'}
             alt={episode.showTitle}
             className="w-16 h-24 rounded-lg object-cover flex-shrink-0"
+            fallback="https://via.placeholder.com/80x120/1a1a1a/ffffff?text=?"
           />
           <div className="flex-1 min-w-0">
             <h4 className="font-bold truncate group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-all">
