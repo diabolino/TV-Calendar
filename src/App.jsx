@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, Download, Play, Clock } from 'lucide-react';
+import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, Download, Play, Clock, Sun, Moon } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast } from './services/tmdb';
+import { useTheme } from './contexts/ThemeContext';
 import AuthAndBackup from './components/AuthAndBackup';
 import UpdateNotification from './components/UpdateNotification';
 import CachedImage from './components/CachedImage';
@@ -19,6 +20,7 @@ import { cleanExpiredImages } from './services/imageCache';
 import { processSyncQueue, addToSyncQueue, hasPendingSync, getPendingSyncCount } from './services/syncQueue';
 
 const App = () => {
+  const { theme, toggleTheme } = useTheme();
   const [shows, setShows] = useState([]);
   const [calendar, setCalendar] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -797,9 +799,9 @@ const App = () => {
   const sortedDates = Object.keys(groupedEpisodes).sort();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-white">
       {/* Header */}
-      <header className="bg-black/30 backdrop-blur-lg border-b border-white/10 sticky top-0 z-50">
+      <header className="bg-white/80 dark:bg-black/30 backdrop-blur-lg border-b border-gray-200 dark:border-white/10 sticky top-0 z-50">
         <div className="max-w-[2000px] mx-auto px-6 py-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -811,6 +813,15 @@ const App = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Toggle theme */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 transition-all"
+                title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+              >
+                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+
               {/* Composant Auth & Backup */}
               <AuthAndBackup
                 user={user}
@@ -825,7 +836,7 @@ const App = () => {
               <button
                 onClick={() => setView('calendar')}
                 className={`px-4 py-2 rounded-lg transition-all ${
-                  view === 'calendar' ? 'bg-purple-600 text-white' : 'bg-white/5 hover:bg-white/10'
+                  view === 'calendar' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
                 }`}
               >
                 Calendrier
@@ -833,7 +844,7 @@ const App = () => {
               <button
                 onClick={() => setView('towatch')}
                 className={`px-4 py-2 rounded-lg transition-all ${
-                  view === 'towatch' ? 'bg-purple-600 text-white' : 'bg-white/5 hover:bg-white/10'
+                  view === 'towatch' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
                 }`}
               >
                 À regarder
@@ -841,7 +852,7 @@ const App = () => {
               <button
                 onClick={() => setView('shows')}
                 className={`px-4 py-2 rounded-lg transition-all ${
-                  view === 'shows' ? 'bg-purple-600 text-white' : 'bg-white/5 hover:bg-white/10'
+                  view === 'shows' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
                 }`}
               >
                 Mes Séries ({shows.length})
@@ -859,7 +870,7 @@ const App = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 placeholder="Rechercher une série (Breaking Bad, The Office...)..."
-                className="w-full bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full bg-white/80 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl pl-12 pr-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
             <button
@@ -873,19 +884,19 @@ const App = () => {
 
           {/* Résultats de recherche */}
           {searchResults.length > 0 && (
-            <div className="bg-white/5 backdrop-blur-lg rounded-2xl p-4 border border-white/10 max-h-96 overflow-y-auto">
+            <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-4 border border-gray-300 dark:border-white/10 max-h-96 overflow-y-auto">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-lg">Résultats de recherche</h3>
                 <button
                   onClick={() => { setSearchResults([]); setSearchQuery(''); }}
-                  className="text-gray-400 hover:text-white transition-all"
+                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <div className="space-y-3">
                 {searchResults.map(show => (
-                  <div key={show.id} className="bg-white/5 rounded-xl p-4 flex items-center gap-4 hover:bg-white/10 transition-all">
+                  <div key={show.id} className="bg-gray-100 dark:bg-white/5 rounded-xl p-4 flex items-center gap-4 hover:bg-gray-200 dark:hover:bg-white/10 transition-all">
                     <img
                       src={show.poster || 'https://via.placeholder.com/100x150/1a1a1a/ffffff?text=No+Image'}
                       alt={show.title}
@@ -893,7 +904,7 @@ const App = () => {
                     />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-lg truncate">{show.title}</h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <span>{show.year}</span>
                         {show.network && <><span>•</span><span>{show.network}</span></>}
                         {show.rating > 0 && (
@@ -909,7 +920,7 @@ const App = () => {
                       {show.genres.length > 0 && (
                         <div className="flex gap-1 mt-1">
                           {show.genres.slice(0, 3).map(genre => (
-                            <span key={genre} className="text-xs bg-white/10 px-2 py-0.5 rounded">{genre}</span>
+                            <span key={genre} className="text-xs bg-gray-200 dark:bg-white/10 px-2 py-0.5 rounded">{genre}</span>
                           ))}
                         </div>
                       )}
@@ -934,27 +945,27 @@ const App = () => {
             {shows.length > 0 && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <button onClick={goToPreviousMonth} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-all" title="Mois précédent">
+                  <button onClick={goToPreviousMonth} className="p-2 bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 rounded-lg transition-all" title="Mois précédent">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
-                  <button onClick={goToToday} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-all font-semibold">
+                  <button onClick={goToToday} className="px-4 py-2 bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 rounded-lg transition-all font-semibold">
                     Aujourd'hui
                   </button>
-                  <button onClick={goToNextMonth} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-all" title="Mois suivant">
+                  <button onClick={goToNextMonth} className="p-2 bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 rounded-lg transition-all" title="Mois suivant">
                     <ChevronRight className="w-5 h-5" />
                   </button>
                   <h2 className="text-2xl font-bold capitalize ml-4">{monthName}</h2>
-                  
+
                   <button onClick={handleRefresh} disabled={loading} className="ml-4 p-2 bg-purple-600/20 hover:bg-purple-600/30 rounded-lg transition-all disabled:opacity-50" title="Rafraîchir">
                     <Download className={`w-5 h-5 text-purple-400 ${loading ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
-                
+
                 <div className="flex gap-2">
-                  <button onClick={() => setCalendarView('month')} className={`p-2 rounded-lg transition-all ${calendarView === 'month' ? 'bg-purple-600' : 'bg-white/5 hover:bg-white/10'}`} title="Vue calendrier">
+                  <button onClick={() => setCalendarView('month')} className={`p-2 rounded-lg transition-all ${calendarView === 'month' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'}`} title="Vue calendrier">
                     <Grid className="w-5 h-5" />
                   </button>
-                  <button onClick={() => setCalendarView('list')} className={`p-2 rounded-lg transition-all ${calendarView === 'list' ? 'bg-purple-600' : 'bg-white/5 hover:bg-white/10'}`} title="Vue liste">
+                  <button onClick={() => setCalendarView('list')} className={`p-2 rounded-lg transition-all ${calendarView === 'list' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'}`} title="Vue liste">
                     <List className="w-5 h-5" />
                   </button>
                 </div>
@@ -965,19 +976,19 @@ const App = () => {
             {loading && calendar.length === 0 ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
-                <p className="mt-4 text-gray-400">Chargement...</p>
+                <p className="mt-4 text-gray-600 dark:text-gray-400">Chargement...</p>
               </div>
             ) : calendar.length === 0 ? (
-              <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
-                <Calendar className="w-16 h-16 mx-auto text-gray-600 mb-4" />
+              <div className="text-center py-12 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-300 dark:border-white/10">
+                <Calendar className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
                 <p className="text-xl font-semibold mb-2">Aucun épisode</p>
-                <p className="text-gray-400">Ajoutez des séries pour voir leur calendrier</p>
+                <p className="text-gray-600 dark:text-gray-400">Ajoutez des séries pour voir leur calendrier</p>
               </div>
             ) : calendarView === 'month' ? (
               <div className="bg-transparent">
                 <div className="grid grid-cols-7 gap-1 mb-1">
                   {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
-                    <div key={day} className="text-center font-semibold text-gray-500 py-3 text-sm uppercase tracking-wider">{day}</div>
+                    <div key={day} className="text-center font-semibold text-gray-500 dark:text-gray-500 py-3 text-sm uppercase tracking-wider">{day}</div>
                   ))}
                 </div>
 
@@ -990,13 +1001,13 @@ const App = () => {
                     return (
                       <div
                         key={index}
-                        className={`min-h-[200px] p-2 bg-white/5 relative ${
+                        className={`min-h-[200px] p-2 bg-white dark:bg-white/5 relative ${
                           !day.isCurrentMonth ? 'opacity-40' : ''
                         } ${
                           isCurrentDay ? 'ring-2 ring-purple-500' : ''
                         }`}
                       >
-                        <div className={`text-sm font-bold mb-2 ${isCurrentDay ? 'text-purple-400' : isPastDay ? 'text-gray-600' : 'text-gray-400'}`}>
+                        <div className={`text-sm font-bold mb-2 ${isCurrentDay ? 'text-purple-400' : isPastDay ? 'text-gray-400 dark:text-gray-600' : 'text-gray-600 dark:text-gray-400'}`}>
                           {day.date.getDate()}
                         </div>
                         <div className="space-y-1.5">
@@ -1009,8 +1020,8 @@ const App = () => {
                               <div
                                 key={episode.id}
                                 onClick={() => toggleWatched(episode.id)}
-                                className={`flex gap-2 p-1.5 rounded cursor-pointer transition-all bg-gray-800/60 hover:bg-gray-700/80 border ${
-                                  isWatched ? 'border-green-500/50' : 'border-gray-700/50 hover:border-gray-600'
+                                className={`flex gap-2 p-1.5 rounded cursor-pointer transition-all bg-gray-100 dark:bg-gray-800/60 hover:bg-gray-200 dark:hover:bg-gray-700/80 border ${
+                                  isWatched ? 'border-green-500/50' : 'border-gray-300 dark:border-gray-700/50 hover:border-gray-400 dark:hover:border-gray-600'
                                 }`}
                               >
                                 <img
@@ -1019,10 +1030,10 @@ const App = () => {
                                   className={`w-10 h-14 rounded object-cover flex-shrink-0 ${isWatched ? 'opacity-60' : ''}`}
                                 />
                                 <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                  <div className="text-xs font-semibold truncate text-gray-200">
+                                  <div className="text-xs font-semibold truncate text-gray-900 dark:text-gray-200">
                                     {episode.showTitle}
                                   </div>
-                                  <div className="text-xs text-gray-400">
+                                  <div className="text-xs text-gray-600 dark:text-gray-400">
                                     S{String(episode.season).padStart(2, '0')}E{String(episode.episode).padStart(2, '0')}
                                   </div>
                                   {isWatched && (
@@ -1035,7 +1046,7 @@ const App = () => {
                           {dayEpisodes.length > 3 && (
                             <div
                               onClick={() => openDayModal(day.date, dayEpisodes)}
-                              className="text-xs text-center py-1.5 font-semibold text-gray-400 hover:text-gray-200 cursor-pointer transition-all"
+                              className="text-xs text-center py-1.5 font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer transition-all"
                             >
                               +{dayEpisodes.length - 3} plus
                             </div>
@@ -1050,17 +1061,17 @@ const App = () => {
               <div className="space-y-6">
                 {sortedDates.map(date => (
                   <div key={date} className="space-y-3">
-                    <h2 className="text-xl font-bold text-purple-400 flex items-center gap-2 sticky top-20 bg-gray-900/95 backdrop-blur-lg py-2 px-4 rounded-lg border border-white/10 z-10">
+                    <h2 className="text-xl font-bold text-purple-400 flex items-center gap-2 sticky top-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg py-2 px-4 rounded-lg border border-gray-300 dark:border-white/10 z-10">
                       <Calendar className="w-5 h-5" />
                       {formatDate(date)}
                     </h2>
-                    
+
                     <div className="grid gap-4">
                       {groupedEpisodes[date].map(episode => {
                         const isWatched = watchedEpisodes[episode.id];
                         return (
-                          <div key={episode.id} onClick={() => toggleWatched(episode.id)} className={`bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border transition-all cursor-pointer hover:scale-[1.02] ${
-                            isWatched ? 'border-green-500/50 bg-green-500/10' : 'border-white/10 hover:border-purple-500/50'
+                          <div key={episode.id} onClick={() => toggleWatched(episode.id)} className={`bg-white dark:bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border transition-all cursor-pointer hover:scale-[1.02] ${
+                            isWatched ? 'border-green-500/50 bg-green-500/10' : 'border-gray-300 dark:border-white/10 hover:border-purple-500/50'
                           }`}>
                             <div className="flex gap-4 p-4">
                               <div className="relative flex-shrink-0">
@@ -1071,7 +1082,7 @@ const App = () => {
                                   </div>
                                 )}
                               </div>
-                              
+
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between mb-2 gap-2">
                                   <div className="min-w-0 flex-1">
@@ -1083,10 +1094,10 @@ const App = () => {
                                     episode.quality === '1080p' ? 'bg-green-600/20 text-green-400' : 'bg-blue-600/20 text-blue-400'
                                   }`}>{episode.quality}</span>
                                 </div>
-                                
-                                {episode.overview && <p className="text-sm text-gray-400 mb-2 line-clamp-2">{episode.overview}</p>}
-                                
-                                <div className="flex items-center gap-4 text-sm text-gray-400">
+
+                                {episode.overview && <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{episode.overview}</p>}
+
+                                <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                                   <span>📅 {episode.airDate}</span>
                                   {isWatched && <span className="text-green-400 flex items-center gap-1"><Check className="w-4 h-4" />Vu</span>}
                                 </div>
@@ -1105,14 +1116,14 @@ const App = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">À regarder</h2>
-              {getShowsToWatch().length > 0 && <span className="text-gray-400">{getShowsToWatch().length} série{getShowsToWatch().length > 1 ? 's' : ''}</span>}
+              {getShowsToWatch().length > 0 && <span className="text-gray-600 dark:text-gray-400">{getShowsToWatch().length} série{getShowsToWatch().length > 1 ? 's' : ''}</span>}
             </div>
 
             {getShowsToWatch().length === 0 ? (
-              <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
+              <div className="text-center py-12 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-300 dark:border-white/10">
                 <Check className="w-16 h-16 mx-auto text-green-600 mb-4" />
                 <p className="text-xl font-semibold mb-2">Tout est à jour !</p>
-                <p className="text-gray-400">Aucun épisode passé en attente</p>
+                <p className="text-gray-600 dark:text-gray-400">Aucun épisode passé en attente</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -1121,7 +1132,7 @@ const App = () => {
                   const isWatched = watchedEpisodes[nextEp.id];
 
                   return (
-                    <div key={show.id} className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all overflow-hidden">
+                    <div key={show.id} className="bg-white dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-gray-300 dark:border-white/10 hover:border-purple-500/50 transition-all overflow-hidden">
                       <div className="flex gap-4 p-4">
                         <div className="relative flex-shrink-0 cursor-pointer" onClick={() => openShowDetails(show)}>
                           <CachedImage
@@ -1153,14 +1164,14 @@ const App = () => {
                                 show.quality === '1080p' ? 'bg-green-600/20 text-green-400' : 'bg-blue-600/20 text-blue-400'
                               }`}>{show.quality}</span>
                               {show.rating > 0 && (
-                                <div className="flex items-center gap-1 text-sm text-gray-400">
+                                <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
                                   <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                                   <span>{show.rating.toFixed(1)}</span>
                                 </div>
                               )}
                             </div>
 
-                            <div className="bg-white/5 rounded-xl p-4 mb-3">
+                            <div className="bg-gray-100 dark:bg-white/5 rounded-xl p-4 mb-3">
                               <div className="flex items-center gap-2 mb-2">
                                 <Clock className="w-5 h-5 text-orange-400" />
                                 <span className="font-semibold text-orange-400">Prochain épisode non vu</span>
@@ -1175,8 +1186,8 @@ const App = () => {
                                   <h4 className="font-bold text-lg mb-1">
                                     S{String(nextEp.season).padStart(2, '0')}E{String(nextEp.episode).padStart(2, '0')} - {nextEp.title}
                                   </h4>
-                                  {nextEp.overview && <p className="text-sm text-gray-400 mb-2 line-clamp-2">{nextEp.overview}</p>}
-                                  <span className="text-xs text-gray-500">📅 {nextEp.airDate}</span>
+                                  {nextEp.overview && <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{nextEp.overview}</p>}
+                                  <span className="text-xs text-gray-500 dark:text-gray-500">📅 {nextEp.airDate}</span>
                                 </div>
                               </div>
                             </div>
@@ -1185,16 +1196,16 @@ const App = () => {
                           <div className="flex items-center justify-between">
                             <div className="flex-1 mr-4">
                               <div className="flex items-center justify-between mb-1">
-                                <span className="text-sm text-gray-400">Progression</span>
+                                <span className="text-sm text-gray-600 dark:text-gray-400">Progression</span>
                                 <span className="text-sm font-semibold">{show.progress}%</span>
                               </div>
-                              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                              <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-2 overflow-hidden">
                                 <div
                                   className="h-full bg-gradient-to-r from-purple-600 to-pink-600 transition-all"
                                   style={{ width: `${show.progress}%` }}
                                 ></div>
                               </div>
-                              <span className="text-xs text-gray-500 mt-1 block">
+                              <span className="text-xs text-gray-500 dark:text-gray-500 mt-1 block">
                                 {show.watchedCount} / {show.totalEpisodes} épisodes vus
                               </span>
                             </div>
@@ -1232,14 +1243,14 @@ const App = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Mes Séries</h2>
-              {shows.length > 0 && <span className="text-gray-400">{shows.length} série{shows.length > 1 ? 's' : ''}</span>}
+              {shows.length > 0 && <span className="text-gray-600 dark:text-gray-400">{shows.length} série{shows.length > 1 ? 's' : ''}</span>}
             </div>
 
             {shows.length === 0 ? (
-              <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
-                <Plus className="w-16 h-16 mx-auto text-gray-600 mb-4" />
+              <div className="text-center py-12 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-300 dark:border-white/10">
+                <Plus className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
                 <p className="text-xl font-semibold mb-2">Aucune série</p>
-                <p className="text-gray-400">Recherchez et ajoutez vos séries préférées</p>
+                <p className="text-gray-600 dark:text-gray-400">Recherchez et ajoutez vos séries préférées</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-8 gap-4">
@@ -1247,7 +1258,7 @@ const App = () => {
                   const stats = getShowStats(show.tvmazeId, show.quality);
 
                   return (
-                    <div key={show.id} onClick={() => openShowDetails(show)} className="bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all group cursor-pointer">
+                    <div key={show.id} onClick={() => openShowDetails(show)} className="bg-white dark:bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border border-gray-300 dark:border-white/10 hover:border-purple-500/50 transition-all group cursor-pointer">
                       <div className="relative">
                         <img src={show.poster || 'https://via.placeholder.com/500x750/1a1a1a/ffffff?text=No+Image'} alt={show.title} className="w-full aspect-[2/3] object-cover" />
 
@@ -1279,13 +1290,13 @@ const App = () => {
 
                         {stats.totalEpisodes > 0 && (
                           <div>
-                            <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden mb-1">
+                            <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-1.5 overflow-hidden mb-1">
                               <div
                                 className="h-full bg-gradient-to-r from-purple-600 to-pink-600"
                                 style={{ width: `${stats.progress}%` }}
                               ></div>
                             </div>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-500 dark:text-gray-500">
                               {stats.watchedCount}/{stats.totalEpisodes} • {stats.progress}%
                             </span>
                           </div>
@@ -1303,7 +1314,7 @@ const App = () => {
       {/* Modal de détails de série */}
       {selectedShowDetail && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={closeShowDetails}>
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/20" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-white/20" onClick={(e) => e.stopPropagation()}>
             <div className="relative h-64 overflow-hidden rounded-t-3xl">
               <CachedImage
                 src={selectedShowDetail.backgroundTMDB || selectedShowDetail.background || selectedShowDetail.poster || 'https://via.placeholder.com/1200x400/1a1a1a/ffffff?text=No+Image'}
@@ -1311,8 +1322,8 @@ const App = () => {
                 className="w-full h-full object-cover"
                 fallback={selectedShowDetail.poster || 'https://via.placeholder.com/1200x400/1a1a1a/ffffff?text=No+Image'}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"></div>
-              
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-100 via-gray-100/50 to-transparent dark:from-gray-900 dark:via-gray-900/50 dark:to-transparent"></div>
+
               <button onClick={closeShowDetails} className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all">
                 <X className="w-6 h-6" />
               </button>
@@ -1320,7 +1331,7 @@ const App = () => {
               <div className="absolute bottom-4 left-6 right-6">
                 <h2 className="text-4xl font-bold mb-2">{selectedShowDetail.title}</h2>
                 <div className="flex items-center gap-4 text-sm">
-                  <span className="text-gray-300">{selectedShowDetail.year}</span>
+                  <span className="text-gray-700 dark:text-gray-300">{selectedShowDetail.year}</span>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                     selectedShowDetail.quality === '4K' ? 'bg-purple-600/30 text-purple-400' :
                     selectedShowDetail.quality === '1080p' ? 'bg-green-600/30 text-green-400' : 'bg-blue-600/30 text-blue-400'
@@ -1339,7 +1350,7 @@ const App = () => {
               {(selectedShowDetail.overviewFR || selectedShowDetail.overview) && (
                 <div>
                   <h3 className="text-xl font-bold mb-3 text-purple-400">Synopsis</h3>
-                  <p className="text-gray-300 leading-relaxed">
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                     {selectedShowDetail.overviewFR || selectedShowDetail.overview}
                   </p>
                 </div>
@@ -1351,7 +1362,7 @@ const App = () => {
                   <h3 className="text-xl font-bold mb-4 text-purple-400">Acteurs principaux</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {selectedShowDetail.cast.map(actor => (
-                      <div key={actor.id} className="bg-white/5 rounded-xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all">
+                      <div key={actor.id} className="bg-gray-100 dark:bg-white/5 rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 hover:border-purple-500/50 transition-all">
                         <CachedImage
                           src={actor.profilePath || 'https://via.placeholder.com/185x278/1a1a1a/ffffff?text=No+Photo'}
                           alt={actor.name}
@@ -1360,7 +1371,7 @@ const App = () => {
                         />
                         <div className="p-3">
                           <p className="font-bold text-sm truncate">{actor.name}</p>
-                          <p className="text-xs text-gray-400 truncate">{actor.character}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{actor.character}</p>
                         </div>
                       </div>
                     ))}
@@ -1403,21 +1414,21 @@ const App = () => {
                         const allWatched = watchedCount === totalCount;
 
                         return (
-                          <div key={season} className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
-                            <div className="p-4 bg-white/5 border-b border-white/10">
+                          <div key={season} className="bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-300 dark:border-white/10 overflow-hidden">
+                            <div className="p-4 bg-gray-200 dark:bg-white/5 border-b border-gray-300 dark:border-white/10">
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                   <h4 className="text-lg font-bold mb-2">Saison {season}</h4>
                                   <div className="flex items-center gap-3">
                                     <div className="flex-1">
-                                      <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                                      <div className="w-full bg-gray-300 dark:bg-white/10 rounded-full h-2 overflow-hidden">
                                         <div
                                           className="h-full bg-gradient-to-r from-purple-600 to-pink-600 transition-all"
                                           style={{ width: `${progress}%` }}
                                         ></div>
                                       </div>
                                     </div>
-                                    <span className="text-sm text-gray-400 whitespace-nowrap">
+                                    <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                                       {watchedCount}/{totalCount} ({progress}%)
                                     </span>
                                   </div>
@@ -1456,7 +1467,7 @@ const App = () => {
                                     key={episode.id}
                                     onClick={() => toggleWatched(episode.id)}
                                     className={`flex gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                                      isWatched ? 'bg-green-500/10 border-green-500/50' : 'bg-white/5 border-white/10 hover:border-purple-500/50'
+                                      isWatched ? 'bg-green-500/10 border-green-500/50' : 'bg-white dark:bg-white/5 border-gray-300 dark:border-white/10 hover:border-purple-500/50'
                                     }`}
                                   >
                                     <img
@@ -1471,9 +1482,9 @@ const App = () => {
                                         </h5>
                                         {isWatched && <Check className="w-4 h-4 text-green-400 flex-shrink-0 ml-2" />}
                                       </div>
-                                      <p className="text-xs text-gray-400 line-clamp-1">{episode.overview}</p>
+                                      <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">{episode.overview}</p>
                                       <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs text-gray-500">📅 {episode.airDate}</span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-500">📅 {episode.airDate}</span>
                                         {isFuture && <span className="text-xs bg-green-600/20 text-green-400 px-2 py-0.5 rounded">À venir</span>}
                                       </div>
                                     </div>
@@ -1486,7 +1497,7 @@ const App = () => {
                       })}
 
                       {seasons.length === 0 && (
-                        <div className="text-center py-8 text-gray-400">
+                        <div className="text-center py-8 text-gray-600 dark:text-gray-400">
                           <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
                           <p>Aucun épisode trouvé</p>
                         </div>
@@ -1503,17 +1514,17 @@ const App = () => {
       {/* Modal du jour - Tous les épisodes d'une date */}
       {selectedDayEpisodes && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={closeDayModal}>
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/20" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-white/20" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="sticky top-0 bg-gray-900/95 backdrop-blur-lg border-b border-white/10 p-6 rounded-t-3xl z-10">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-b border-gray-300 dark:border-white/10 p-6 rounded-t-3xl z-10">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-3xl font-bold mb-1">
                     {formatDate(selectedDayEpisodes.date.toISOString().split('T')[0])}
                   </h2>
-                  <p className="text-gray-400">{selectedDayEpisodes.episodes.length} épisode{selectedDayEpisodes.episodes.length > 1 ? 's' : ''}</p>
+                  <p className="text-gray-600 dark:text-gray-400">{selectedDayEpisodes.episodes.length} épisode{selectedDayEpisodes.episodes.length > 1 ? 's' : ''}</p>
                 </div>
-                <button onClick={closeDayModal} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-full transition-all">
+                <button onClick={closeDayModal} className="bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-900 dark:text-white p-3 rounded-full transition-all">
                   <X className="w-6 h-6" />
                 </button>
               </div>
@@ -1524,19 +1535,19 @@ const App = () => {
               {selectedDayEpisodes.episodes.map(episode => {
                 const isWatched = watchedEpisodes[episode.id];
                 return (
-                  <div 
-                    key={episode.id} 
+                  <div
+                    key={episode.id}
                     onClick={() => toggleWatched(episode.id)}
-                    className={`bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border transition-all cursor-pointer hover:scale-[1.02] ${
-                      isWatched ? 'border-green-500/50 bg-green-500/10' : 'border-white/10 hover:border-purple-500/50'
+                    className={`bg-white dark:bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border transition-all cursor-pointer hover:scale-[1.02] ${
+                      isWatched ? 'border-green-500/50 bg-green-500/10' : 'border-gray-300 dark:border-white/10 hover:border-purple-500/50'
                     }`}
                   >
                     <div className="flex gap-4 p-4">
                       <div className="relative flex-shrink-0">
-                        <img 
-                          src={episode.image || 'https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image'} 
-                          alt={episode.title} 
-                          className={`w-48 h-28 rounded-lg object-cover transition-opacity ${isWatched ? 'opacity-50' : ''}`} 
+                        <img
+                          src={episode.image || 'https://via.placeholder.com/300x170/2d3748/ffffff?text=No+Image'}
+                          alt={episode.title}
+                          className={`w-48 h-28 rounded-lg object-cover transition-opacity ${isWatched ? 'opacity-50' : ''}`}
                         />
                         {isWatched && (
                           <div className="absolute inset-0 flex items-center justify-center">
@@ -1546,7 +1557,7 @@ const App = () => {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2 gap-2">
                           <div className="min-w-0 flex-1">
@@ -1562,12 +1573,12 @@ const App = () => {
                             {episode.quality}
                           </span>
                         </div>
-                        
+
                         {episode.overview && (
-                          <p className="text-sm text-gray-400 mb-2 line-clamp-2">{episode.overview}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{episode.overview}</p>
                         )}
-                        
-                        <div className="flex items-center gap-4 text-sm text-gray-400">
+
+                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                           <span>📅 {episode.airDate}</span>
                           {isWatched && (
                             <span className="text-green-400 flex items-center gap-1">
