@@ -22,7 +22,6 @@ import {
 import { exportData, importData } from './services/exportImport';
 import { cleanExpiredImages } from './services/imageCache';
 import { processSyncQueue, addToSyncQueue, hasPendingSync, getPendingSyncCount } from './services/syncQueue';
-import { open } from '@tauri-apps/plugin-shell';
 import packageJson from '../package.json';
 
 const App = () => {
@@ -351,8 +350,13 @@ const App = () => {
   const checkForUpdates = async () => {
     try {
       const response = await fetch('https://api.github.com/repos/diabolino/TV-Calendar/releases/latest');
+
+      if (!response.ok) {
+        throw new Error(`GitHub API erreur: ${response.status}`);
+      }
+
       const data = await response.json();
-      const latestVersion = data.tag_name.replace('v', ''); // Enlever le "v" du tag
+      const latestVersion = data.tag_name.replace('v', '');
 
       // Comparer les versions correctement (ex: 2.4.1 vs 2.4.0)
       const parseVersion = (v) => v.split('.').map(n => parseInt(n));
@@ -365,14 +369,26 @@ const App = () => {
 
       if (isNewer) {
         if (confirm(`Une nouvelle version ${latestVersion} est disponible ! (Version actuelle: ${currentVersion})\n\nVoulez-vous ouvrir la page de téléchargement ?`)) {
-          await open(data.html_url);
+          try {
+            // Import dynamique du plugin shell
+            const { open } = await import('@tauri-apps/plugin-shell');
+            await open(data.html_url);
+          } catch (shellError) {
+            console.error('Erreur shell plugin:', shellError);
+            // Fallback sur window.open si le plugin Tauri échoue
+            try {
+              window.open(data.html_url, '_blank');
+            } catch (windowError) {
+              alert('Impossible d\'ouvrir le navigateur automatiquement.\n\nCopiez ce lien manuellement:\n' + data.html_url);
+            }
+          }
         }
       } else {
         alert(`Vous avez la dernière version (${currentVersion}) ! ✅`);
       }
     } catch (error) {
-      console.error('Erreur lors de la vérification des mises à jour:', error);
-      alert('Impossible de vérifier les mises à jour. Vérifiez votre connexion internet.');
+      console.error('Erreur vérification MAJ:', error);
+      alert(`Erreur lors de la vérification des mises à jour:\n${error.message}\n\nVérifiez votre connexion internet.`);
     }
   };
 
