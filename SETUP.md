@@ -35,6 +35,10 @@ Pour que les builds automatiques fonctionnent, vous devez ajouter toutes les cl�
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
 
+**Secrets Auto-Update (Tauri) :**
+- `TAURI_SIGNING_PRIVATE_KEY` → Contenu du fichier `src-tauri/updater.key`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` → Laisser vide (aucun mot de passe configuré)
+
 Le workflow GitHub Actions créera automatiquement le fichier `.env` lors du build avec ces secrets.
 
 ## Sécurité
