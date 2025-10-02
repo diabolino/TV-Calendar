@@ -414,7 +414,11 @@ const App = () => {
 
   // Obtenir les épisodes d'une date
   const getEpisodesForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    // Utiliser les méthodes locales au lieu de toISOString() pour éviter les problèmes de fuseau horaire
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     return calendar.filter(ep => ep.airDate === dateStr);
   };
 
