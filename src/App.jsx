@@ -22,6 +22,7 @@ import {
 import { exportData, importData } from './services/exportImport';
 import { cleanExpiredImages } from './services/imageCache';
 import { processSyncQueue, addToSyncQueue, hasPendingSync, getPendingSyncCount } from './services/syncQueue';
+import { open } from '@tauri-apps/plugin-shell';
 import packageJson from '../package.json';
 
 const App = () => {
@@ -364,7 +365,7 @@ const App = () => {
 
       if (isNewer) {
         if (confirm(`Une nouvelle version ${latestVersion} est disponible ! (Version actuelle: ${currentVersion})\n\nVoulez-vous ouvrir la page de téléchargement ?`)) {
-          window.open(data.html_url, '_blank');
+          await open(data.html_url);
         }
       } else {
         alert(`Vous avez la dernière version (${currentVersion}) ! ✅`);
