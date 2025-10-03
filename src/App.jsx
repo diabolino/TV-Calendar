@@ -467,25 +467,20 @@ const App = () => {
   };
 
   // Générer une couleur unique pour une série (basée sur l'ID)
+  // Utilise HSL pour générer des couleurs distinctes pour chaque série (jusqu'à plusieurs milliers)
   const getShowColor = (showId) => {
-    const colors = [
-      'bg-red-500/80',
-      'bg-blue-500/80',
-      'bg-green-500/80',
-      'bg-yellow-500/80',
-      'bg-purple-500/80',
-      'bg-pink-500/80',
-      'bg-indigo-500/80',
-      'bg-orange-500/80',
-      'bg-cyan-500/80',
-      'bg-teal-500/80',
-      'bg-lime-500/80',
-      'bg-amber-500/80',
-    ];
-
-    // Utiliser un hash simple de l'ID pour choisir une couleur
+    // Créer un hash de l'ID pour générer une teinte unique
     const hash = showId.toString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length];
+
+    // Utiliser le nombre d'or (golden ratio) pour espacer les teintes de manière optimale
+    const goldenRatio = 0.618033988749895;
+    const hue = (hash * goldenRatio * 360) % 360;
+
+    // Saturation et luminosité fixes pour des couleurs vives et lisibles
+    const saturation = 70; // Entre 65-75% pour des couleurs vives mais pas criardes
+    const lightness = theme === 'dark' ? 55 : 50; // Légèrement plus clair en mode sombre
+
+    return `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`;
   };
 
   // Obtenir les jours de la semaine courante
@@ -1170,15 +1165,16 @@ const App = () => {
                             const isWatched = watchedEpisodes[episode.id];
                             // Trouver la série correspondante pour obtenir l'affiche
                             const show = shows.find(s => s.tvmazeId === episode.showId && s.quality === episode.quality);
-                            const colorClass = getShowColor(episode.showId);
+                            const bgColor = getShowColor(episode.showId);
 
                             return (
                               <div
                                 key={episode.id}
                                 onClick={() => toggleWatched(episode.id)}
-                                className={`flex gap-2 p-1.5 rounded cursor-pointer transition-all ${colorClass} hover:opacity-90 border-2 ${
+                                className={`flex gap-2 p-1.5 rounded cursor-pointer transition-all hover:opacity-90 border-2 ${
                                   isWatched ? 'border-green-500/50 opacity-60' : 'border-transparent'
                                 }`}
+                                style={{ backgroundColor: bgColor }}
                               >
                                 <CachedImage
                                   src={show?.poster || 'https://via.placeholder.com/40x60/1a1a1a/ffffff?text=?'}
@@ -1258,7 +1254,7 @@ const App = () => {
                             dayEpisodes.map(episode => {
                               const isWatched = watchedEpisodes[episode.id];
                               const show = shows.find(s => s.tvmazeId === episode.showId && s.quality === episode.quality);
-                              const colorClass = getShowColor(episode.showId);
+                              const bgColor = getShowColor(episode.showId);
 
                               return (
                                 <div
@@ -1277,7 +1273,7 @@ const App = () => {
                                       fallback="https://via.placeholder.com/200x300/1a1a1a/ffffff?text=No+Poster"
                                     />
                                   )}
-                                  <div className={`p-2 ${colorClass}`}>
+                                  <div className="p-2" style={{ backgroundColor: bgColor }}>
                                     <div className="text-white">
                                       <div className="font-bold text-xs truncate">{episode.showTitle}</div>
                                       <div className="text-[10px] opacity-90">
