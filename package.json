@@ -1,6 +1,6 @@
 {
   "name": "tv-calendar",
-  "version": "2.4.9",
+  "version": "2.5.0",
   "description": "Application de calendrier TV moderne (Tauri)",
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "tauri:build:debug": "tauri build --debug"
   },
   "dependencies": {
+    "@tauri-apps/plugin-opener": "^2.5.0",
     "@tauri-apps/plugin-process": "^2",
     "@tauri-apps/plugin-shell": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2",

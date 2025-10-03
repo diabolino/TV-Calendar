@@ -370,11 +370,11 @@ const App = () => {
       if (isNewer) {
         if (confirm(`Une nouvelle version ${latestVersion} est disponible ! (Version actuelle: ${currentVersion})\n\nVoulez-vous ouvrir la page de téléchargement ?`)) {
           try {
-            // Import dynamique du plugin shell
-            const { open } = await import('@tauri-apps/plugin-shell');
-            await open(data.html_url);
-          } catch (shellError) {
-            console.error('Erreur shell plugin:', shellError);
+            // Utiliser le plugin opener (le bon plugin pour ouvrir des URLs)
+            const { openUrl } = await import('@tauri-apps/plugin-opener');
+            await openUrl(data.html_url);
+          } catch (openerError) {
+            console.error('Erreur opener plugin:', openerError);
             // Fallback sur window.open si le plugin Tauri échoue
             try {
               window.open(data.html_url, '_blank');
