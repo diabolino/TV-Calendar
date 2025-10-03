@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "TVCalendar",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "identifier": "com.tvcalendar",
   "build": {
     "frontendDist": "../dist",
@@ -18,7 +18,8 @@
         "minWidth": 1000,
         "minHeight": 700,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "maximized": true
       }
     ],
     "security": {
@@ -27,7 +28,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "app",
+      "dmg",
+      "nsis",
+      "deb",
+      "appimage"
+    ],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",

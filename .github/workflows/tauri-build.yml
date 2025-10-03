@@ -13,11 +13,11 @@ jobs:
       matrix:
         include:
           - platform: 'macos-latest'
-            args: ''
+            args: '--bundles app dmg'
           - platform: 'ubuntu-22.04'
-            args: ''
+            args: '--bundles deb appimage'
           - platform: 'windows-latest'
-            args: ''
+            args: '--bundles app nsis'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -63,6 +63,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
+          args: ${{ matrix.args }}
           tagName: ${{ github.ref_name }}
           releaseName: 'TVCalendar v__VERSION__'
           releaseBody: 'Téléchargez les fichiers ci-dessous pour installer cette version.'
