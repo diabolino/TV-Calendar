@@ -346,42 +346,18 @@ const App = () => {
     loadCalendar(true);
   };
 
-  // Vérifier les mises à jour sur GitHub
+  // Vérifier les mises à jour manuellement (utilise la même logique que UpdateNotification)
   const checkForUpdates = async () => {
     try {
-      const response = await fetch('https://api.github.com/repos/diabolino/TV-Calendar/releases/latest');
+      // Importer le plugin updater (même méthode que UpdateNotification)
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
 
-      if (!response.ok) {
-        throw new Error(`GitHub API erreur: ${response.status}`);
-      }
+      const update = await check();
 
-      const data = await response.json();
-      const latestVersion = data.tag_name.replace('v', '');
-
-      // Comparer les versions correctement (ex: 2.4.1 vs 2.4.0)
-      const parseVersion = (v) => v.split('.').map(n => parseInt(n));
-      const [latestMajor, latestMinor, latestPatch] = parseVersion(latestVersion);
-      const [currentMajor, currentMinor, currentPatch] = parseVersion(currentVersion);
-
-      const isNewer = latestMajor > currentMajor ||
-                      (latestMajor === currentMajor && latestMinor > currentMinor) ||
-                      (latestMajor === currentMajor && latestMinor === currentMinor && latestPatch > currentPatch);
-
-      if (isNewer) {
-        if (confirm(`Une nouvelle version ${latestVersion} est disponible ! (Version actuelle: ${currentVersion})\n\nVoulez-vous ouvrir la page de téléchargement ?`)) {
-          try {
-            // Utiliser le plugin opener (le bon plugin pour ouvrir des URLs)
-            const { openUrl } = await import('@tauri-apps/plugin-opener');
-            await openUrl(data.html_url);
-          } catch (openerError) {
-            console.error('Erreur opener plugin:', openerError);
-            // Fallback sur window.open si le plugin Tauri échoue
-            try {
-              window.open(data.html_url, '_blank');
-            } catch (windowError) {
-              alert('Impossible d\'ouvrir le navigateur automatiquement.\n\nCopiez ce lien manuellement:\n' + data.html_url);
-            }
-          }
+      if (update?.available) {
+        if (confirm(`Une nouvelle version ${update.version} est disponible ! (Version actuelle: ${currentVersion})\n\nVoulez-vous ouvrir la page de téléchargement ?`)) {
+          await openUrl(`https://github.com/diabolino/TV-Calendar/releases/tag/v${update.version}`);
         }
       } else {
         alert(`Vous avez la dernière version (${currentVersion}) ! ✅`);

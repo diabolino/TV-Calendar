@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 export default function UpdateNotification() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
 
   useEffect(() => {
     checkForUpdates();
@@ -25,31 +23,12 @@ export default function UpdateNotification() {
     }
   };
 
-  const installUpdate = async () => {
-    if (!updateInfo) return;
-
-    setDownloading(true);
+  const openReleasePage = async () => {
     try {
-      await updateInfo.downloadAndInstall((event) => {
-        switch (event.event) {
-          case 'Started':
-            console.log('Download started');
-            break;
-          case 'Progress':
-            setDownloadProgress(event.data.chunkLength);
-            console.log(`Downloaded ${event.data.chunkLength} bytes`);
-            break;
-          case 'Finished':
-            console.log('Download finished');
-            break;
-        }
-      });
-
-      // Restart the app after update
-      await relaunch();
+      // Ouvrir la page des releases GitHub
+      await openUrl(`https://github.com/diabolino/TV-Calendar/releases/tag/v${updateInfo.version}`);
     } catch (error) {
-      console.error('Error installing update:', error);
-      setDownloading(false);
+      console.error('Error opening release page:', error);
     }
   };
 
@@ -65,7 +44,6 @@ export default function UpdateNotification() {
         <button
           onClick={() => setUpdateAvailable(false)}
           className="text-white hover:text-gray-200"
-          disabled={downloading}
         >
           ✕
         </button>
@@ -77,16 +55,14 @@ export default function UpdateNotification() {
 
       <div className="flex gap-2">
         <button
-          onClick={installUpdate}
-          disabled={downloading}
-          className="flex-1 bg-white text-blue-600 px-4 py-2 rounded font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={openReleasePage}
+          className="flex-1 bg-white text-blue-600 px-4 py-2 rounded font-medium hover:bg-gray-100"
         >
-          {downloading ? `Téléchargement... ${downloadProgress}` : 'Mettre à jour'}
+          Télécharger
         </button>
         <button
           onClick={() => setUpdateAvailable(false)}
-          disabled={downloading}
-          className="px-4 py-2 rounded border border-white hover:bg-blue-700 disabled:opacity-50"
+          className="px-4 py-2 rounded border border-white hover:bg-blue-700"
         >
           Plus tard
         </button>
