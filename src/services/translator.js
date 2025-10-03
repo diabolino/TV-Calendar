@@ -1,13 +1,37 @@
 // Service de traduction avec LibreTranslate
 import axios from 'axios';
 
-const LIBRETRANSLATE_URL = import.meta.env.VITE_LIBRETRANSLATE_URL || 'https://libretranslate.com/translate';
+/**
+ * Récupérer l'URL LibreTranslate depuis localStorage
+ */
+export const getLibreTranslateURL = () => {
+  return localStorage.getItem('libreTranslateURL') || '';
+};
+
+/**
+ * Définir l'URL LibreTranslate dans localStorage
+ */
+export const setLibreTranslateURL = (url) => {
+  if (url && url.trim()) {
+    localStorage.setItem('libreTranslateURL', url.trim());
+  } else {
+    localStorage.removeItem('libreTranslateURL');
+  }
+};
 
 /**
  * Traduire un texte de l'anglais vers le français avec LibreTranslate
  */
 export const translateToFrench = async (text) => {
   if (!text || text.trim() === '') {
+    return null;
+  }
+
+  const LIBRETRANSLATE_URL = getLibreTranslateURL();
+
+  // Si pas d'URL configurée, ne pas traduire
+  if (!LIBRETRANSLATE_URL) {
+    console.log('⚠️ LibreTranslate non configuré, traduction désactivée');
     return null;
   }
 
@@ -18,7 +42,6 @@ export const translateToFrench = async (text) => {
       target: 'fr',
       format: 'text'
     }, {
-
       headers: {
         'Content-Type': 'application/json'
       },
@@ -58,6 +81,8 @@ export const areSimilar = (text1, text2) => {
 
 export default {
   translateToFrench,
+  setLibreTranslateURL,
+  getLibreTranslateURL,
   isEnglish,
   areSimilar
 };

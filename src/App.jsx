@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv } from 'lucide-react';
+import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv, Settings } from 'lucide-react';
 import { searchShows, getShowEpisodes, enrichEpisodesWithTranslations } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast, getEnrichedShowDetails } from './services/tmdb';
+import { getLibreTranslateURL, setLibreTranslateURL } from './services/translator';
 import { useTheme } from './contexts/ThemeContext';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useCalendarWorker } from './hooks/useCalendarWorker';
@@ -67,6 +68,8 @@ const App = () => {
   const [filteredShows, setFilteredShows] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null); // ID de la série à supprimer
   const [showAllCast, setShowAllCast] = useState(false); // Afficher tout le casting
+  const [showSettings, setShowSettings] = useState(false); // Afficher les paramètres
+  const [libreTranslateURL, setLibreTranslateURLState] = useState(''); // URL LibreTranslate
 
   // Charger depuis localStorage
   useEffect(() => {
@@ -87,6 +90,10 @@ const App = () => {
     if (savedWatched) {
       setWatchedEpisodes(JSON.parse(savedWatched));
     }
+
+    // Charger l'URL LibreTranslate
+    const savedURL = getLibreTranslateURL();
+    setLibreTranslateURLState(savedURL);
   }, []);
 
   // Sauvegarder dans localStorage ET sync cloud si connecté
@@ -410,6 +417,13 @@ const App = () => {
   const cancelDelete = useCallback(() => {
     setShowDeleteConfirm(null);
   }, []);
+
+  // Sauvegarder l'URL LibreTranslate
+  const saveLibreTranslateURL = useCallback(() => {
+    setLibreTranslateURL(libreTranslateURL);
+    setShowSettings(false);
+    alert('✅ URL LibreTranslate sauvegardée ! Rechargez les séries pour appliquer les traductions.');
+  }, [libreTranslateURL]);
 
   // Marquer un épisode comme vu
   const toggleWatched = (episodeId) => {
@@ -1003,6 +1017,15 @@ const App = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Paramètres */}
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 rounded-lg bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 transition-all"
+                title="Paramètres"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+
               {/* Toggle theme */}
               <button
                 onClick={toggleTheme}
@@ -2182,6 +2205,66 @@ const App = () => {
               >
                 Supprimer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal des paramètres */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-2xl w-full mx-4 border border-gray-300 dark:border-white/10">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold">Paramètres</h3>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Section LibreTranslate */}
+              <div>
+                <h4 className="text-lg font-bold mb-2 text-purple-400">Traduction automatique</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Configurez l'URL de votre serveur LibreTranslate pour activer la traduction automatique des résumés d'épisodes en français.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      URL LibreTranslate
+                    </label>
+                    <input
+                      type="url"
+                      value={libreTranslateURL}
+                      onChange={(e) => setLibreTranslateURLState(e.target.value)}
+                      placeholder="https://example.com/translate"
+                      className="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">
+                    💡 Laissez vide pour désactiver la traduction automatique. Seules les traductions officielles TMDB seront utilisées.
+                  </p>
+                </div>
+              </div>
+
+              {/* Boutons */}
+              <div className="flex gap-3 justify-end pt-4 border-t border-gray-300 dark:border-white/10">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 rounded-lg font-semibold transition-all"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={saveLibreTranslateURL}
+                  className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-semibold transition-all"
+                >
+                  Sauvegarder
+                </button>
+              </div>
             </div>
           </div>
         </div>
