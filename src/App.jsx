@@ -1732,6 +1732,16 @@ const App = () => {
                     setWatchedEpisodes(newWatched);
                   };
 
+                  // Déterminer la saison en cours (celle avec des épisodes non vus et au moins un épisode passé)
+                  const currentSeason = seasons.find(season => {
+                    const seasonEpisodes = seasonGroups[season];
+                    // Une saison est "en cours" si elle a au moins un épisode non vu
+                    // ET au moins un épisode déjà diffusé (passé)
+                    const hasUnwatched = seasonEpisodes.some(ep => !watchedEpisodes[ep.id]);
+                    const hasPastEpisode = seasonEpisodes.some(ep => isPast(ep.airDate));
+                    return hasUnwatched && hasPastEpisode;
+                  });
+
                   return (
                     <div className="space-y-4">
                       {seasons.map(season => {
@@ -1741,12 +1751,19 @@ const App = () => {
                         const progress = totalCount > 0 ? Math.round((watchedCount / totalCount) * 100) : 0;
                         const allWatched = watchedCount === totalCount;
 
+                        // Inverser l'ordre des épisodes uniquement pour la saison en cours
+                        const isCurrentSeason = season === currentSeason;
+                        const displayEpisodes = isCurrentSeason ? [...episodes].reverse() : episodes;
+
                         return (
                           <div key={season} className="bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-300 dark:border-white/10 overflow-hidden">
                             <div className="p-4 bg-gray-200 dark:bg-white/5 border-b border-gray-300 dark:border-white/10">
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
-                                  <h4 className="text-lg font-bold mb-2">Saison {season}</h4>
+                                  <h4 className="text-lg font-bold mb-2">
+                                    Saison {season}
+                                    {isCurrentSeason && <span className="ml-2 text-xs bg-purple-600/20 text-purple-400 px-2 py-1 rounded">En cours</span>}
+                                  </h4>
                                   <div className="flex items-center gap-3">
                                     <div className="flex-1">
                                       <div className="w-full bg-gray-300 dark:bg-white/10 rounded-full h-2 overflow-hidden">
@@ -1787,7 +1804,7 @@ const App = () => {
                               </div>
                             </div>
                             <div className="p-4 space-y-2">
-                              {episodes.map(episode => {
+                              {displayEpisodes.map(episode => {
                                 const isWatched = watchedEpisodes[episode.id];
                                 const isFuture = !isPast(episode.airDate);
                                 return (
