@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast, getEnrichedShowDetails } from './services/tmdb';
@@ -362,11 +362,11 @@ const App = () => {
   };
 
   // Supprimer une série
-  const removeShow = (showId) => {
+  const removeShow = useCallback((showId) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette série ?')) {
       setShows(prev => prev.filter(s => s.id !== showId));
     }
-  };
+  }, []);
 
   // Marquer un épisode comme vu
   const toggleWatched = (episodeId) => {
