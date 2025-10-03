@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast } from './services/tmdb';
@@ -27,6 +27,7 @@ import packageJson from '../package.json';
 const App = () => {
   const { theme, toggleTheme } = useTheme();
   const currentVersion = packageJson.version;
+  const updateNotificationRef = useRef(null);
   const [shows, setShows] = useState([]);
   const [calendar, setCalendar] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -346,25 +347,10 @@ const App = () => {
     loadCalendar(true);
   };
 
-  // Vérifier les mises à jour manuellement (utilise la même logique que UpdateNotification)
-  const checkForUpdates = async () => {
-    try {
-      // Importer le plugin updater (même méthode que UpdateNotification)
-      const { check } = await import('@tauri-apps/plugin-updater');
-      const { openUrl } = await import('@tauri-apps/plugin-opener');
-
-      const update = await check();
-
-      if (update?.available) {
-        if (confirm(`Une nouvelle version ${update.version} est disponible ! (Version actuelle: ${currentVersion})\n\nVoulez-vous ouvrir la page de téléchargement ?`)) {
-          await openUrl(`https://github.com/diabolino/TV-Calendar/releases/tag/v${update.version}`);
-        }
-      } else {
-        alert(`Vous avez la dernière version (${currentVersion}) ! ✅`);
-      }
-    } catch (error) {
-      console.error('Erreur vérification MAJ:', error);
-      alert(`Erreur lors de la vérification des mises à jour:\n${error.message}\n\nVérifiez votre connexion internet.`);
+  // Vérifier les mises à jour manuellement (appelle UpdateNotification via ref)
+  const checkForUpdates = () => {
+    if (updateNotificationRef.current) {
+      updateNotificationRef.current.checkForUpdates();
     }
   };
 
@@ -1946,7 +1932,7 @@ const App = () => {
       )}
 
       {/* Update Notification */}
-      <UpdateNotification />
+      <UpdateNotification ref={updateNotificationRef} />
 
       {/* Keyboard Shortcuts Help */}
       <KeyboardShortcutsHelp
