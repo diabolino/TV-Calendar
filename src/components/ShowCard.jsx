@@ -2,7 +2,7 @@ import React from 'react';
 import { Star, Play, Trash2 } from 'lucide-react';
 import CachedImage from './CachedImage';
 
-const ShowCard = React.memo(({ show, stats, onShowClick, onRemoveShow }) => {
+const ShowCard = ({ show, stats, onShowClick, onRemoveShow }) => {
   return (
     <div
       onClick={() => onShowClick(show)}
@@ -24,7 +24,10 @@ const ShowCard = React.memo(({ show, stats, onShowClick, onRemoveShow }) => {
         )}
 
         <button
-          onClick={(e) => { e.stopPropagation(); onRemoveShow(show.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemoveShow(show.id);
+          }}
           className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all"
         >
           <Trash2 className="w-4 h-4" />
@@ -62,14 +65,7 @@ const ShowCard = React.memo(({ show, stats, onShowClick, onRemoveShow }) => {
       </div>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Optimisation: ne re-render que si les données importantes changent
-  return (
-    prevProps.show.id === nextProps.show.id &&
-    prevProps.stats.progress === nextProps.stats.progress &&
-    prevProps.stats.nextEpisode?.id === nextProps.stats.nextEpisode?.id
-  );
-});
+};
 
 ShowCard.displayName = 'ShowCard';
 

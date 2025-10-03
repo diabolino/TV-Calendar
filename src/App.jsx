@@ -64,6 +64,8 @@ const App = () => {
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'watching', 'completed', 'upcoming', 'backlog', 'hiatus'
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [filteredShows, setFilteredShows] = useState([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null); // ID de la série à supprimer
+  const [showAllCast, setShowAllCast] = useState(false); // Afficher tout le casting
 
   // Charger depuis localStorage
   useEffect(() => {
@@ -363,9 +365,19 @@ const App = () => {
 
   // Supprimer une série
   const removeShow = useCallback((showId) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette série ?')) {
-      setShows(prev => prev.filter(s => s.id !== showId));
+    // Afficher la modal de confirmation
+    setShowDeleteConfirm(showId);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (showDeleteConfirm) {
+      setShows(prev => prev.filter(s => s.id !== showDeleteConfirm));
+      setShowDeleteConfirm(null);
     }
+  }, [showDeleteConfirm]);
+
+  const cancelDelete = useCallback(() => {
+    setShowDeleteConfirm(null);
   }, []);
 
   // Marquer un épisode comme vu
@@ -547,6 +559,7 @@ const App = () => {
     setSelectedShowDetail(show);
     setShowAllFutureEpisodes(false); // Réinitialiser
     setShowAllPastEpisodes(false);
+    setShowAllCast(false); // Réinitialiser l'affichage du cast
 
     // Si pas de synopsis français ou cast, essayer de les récupérer
     if (!show.overviewFR && !show.tmdbId) {
@@ -603,6 +616,7 @@ const App = () => {
     setSelectedShowDetail(null);
     setShowAllFutureEpisodes(false);
     setShowAllPastEpisodes(false);
+    setShowAllCast(false); // Réinitialiser l'affichage du cast
   };
 
   // Ouvrir la modal de jour
@@ -1775,22 +1789,39 @@ const App = () => {
               {/* Acteurs principaux */}
               {(selectedShowDetail.cast?.length > 0 || selectedShowDetail.enrichedDetails?.cast?.length > 0) && (
                 <div>
-                  <h3 className="text-xl font-bold mb-4 text-purple-400">Acteurs principaux</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-purple-400">Acteurs principaux</h3>
+                    {(() => {
+                      const fullCast = selectedShowDetail.enrichedDetails?.cast || selectedShowDetail.cast || [];
+                      return fullCast.length > 5 && (
+                        <button
+                          onClick={() => setShowAllCast(!showAllCast)}
+                          className="text-sm text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                        >
+                          {showAllCast ? 'Voir moins' : `Voir plus (${fullCast.length})`}
+                        </button>
+                      );
+                    })()}
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {(selectedShowDetail.enrichedDetails?.cast || selectedShowDetail.cast || []).map(actor => (
-                      <div key={actor.id} className="bg-gray-100 dark:bg-white/5 rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 hover:border-purple-500/50 transition-all">
-                        <CachedImage
-                          src={actor.profilePath || 'https://via.placeholder.com/185x278/1a1a1a/ffffff?text=No+Photo'}
-                          alt={actor.name}
-                          className="w-full aspect-[2/3] object-cover"
-                          fallback="https://via.placeholder.com/185x278/1a1a1a/ffffff?text=No+Photo"
-                        />
-                        <div className="p-3">
-                          <p className="font-bold text-sm truncate">{actor.name}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{actor.character}</p>
+                    {(() => {
+                      const fullCast = selectedShowDetail.enrichedDetails?.cast || selectedShowDetail.cast || [];
+                      const displayCast = showAllCast ? fullCast : fullCast.slice(0, 5);
+                      return displayCast.map(actor => (
+                        <div key={actor.id} className="bg-gray-100 dark:bg-white/5 rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 hover:border-purple-500/50 transition-all">
+                          <CachedImage
+                            src={actor.profilePath || 'https://via.placeholder.com/185x278/1a1a1a/ffffff?text=No+Photo'}
+                            alt={actor.name}
+                            className="w-full aspect-[2/3] object-cover"
+                            fallback="https://via.placeholder.com/185x278/1a1a1a/ffffff?text=No+Photo"
+                          />
+                          <div className="p-3">
+                            <p className="font-bold text-sm truncate">{actor.name}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{actor.character}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
               )}
@@ -2040,6 +2071,32 @@ const App = () => {
         isOpen={showKeyboardHelp}
         onClose={() => setShowKeyboardHelp(false)}
       />
+
+      {/* Modal de confirmation de suppression */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-300 dark:border-white/10">
+            <h3 className="text-xl font-bold mb-4">Confirmer la suppression</h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              Êtes-vous sûr de vouloir supprimer cette série ? Cette action est irréversible.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 rounded-lg font-semibold transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="py-6 text-center">
