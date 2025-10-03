@@ -364,7 +364,7 @@ const App = () => {
   // Supprimer une série
   const removeShow = (showId) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette série ?')) {
-      setShows(shows.filter(s => s.id !== showId));
+      setShows(prev => prev.filter(s => s.id !== showId));
     }
   };
 
