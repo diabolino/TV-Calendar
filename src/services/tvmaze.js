@@ -1,5 +1,6 @@
 // src/services/tvmaze.js
 import axios from 'axios';
+import { getEpisodeOverviewFR } from './tmdb.js';
 
 const TVMAZE_BASE_URL = 'https://api.tvmaze.com';
 
@@ -54,7 +55,7 @@ export const getShowEpisodes = async (showId) => {
     console.log('📺 Récupération épisodes pour série:', showId);
     const response = await tvmazeApi.get(`/shows/${showId}/episodes`);
     console.log('✅ Épisodes récupérés:', response.data.length);
-    
+
     return response.data.map(episode => ({
       id: episode.id,
       showId: showId,
@@ -71,6 +72,59 @@ export const getShowEpisodes = async (showId) => {
     console.error('❌ Erreur récupération épisodes:', error.message);
     return [];
   }
+};
+
+// Enrichir les épisodes avec les résumés traduits en français
+export const enrichEpisodesWithTranslations = async (episodes, tmdbId) => {
+  if (!tmdbId || !episodes || episodes.length === 0) {
+    return episodes;
+  }
+
+  console.log(`🌍 Enrichissement de ${episodes.length} épisodes avec traductions FR`);
+
+  // Traiter les épisodes en parallèle (par groupes de 5 pour ne pas surcharger l'API)
+  const enrichedEpisodes = [];
+  const batchSize = 5;
+
+  for (let i = 0; i < episodes.length; i += batchSize) {
+    const batch = episodes.slice(i, i + batchSize);
+    const enrichedBatch = await Promise.all(
+      batch.map(async (episode) => {
+        try {
+          const translationResult = await getEpisodeOverviewFR(
+            tmdbId,
+            episode.season,
+            episode.episode,
+            episode.overview
+          );
+
+          if (translationResult) {
+            return {
+              ...episode,
+              overview: translationResult.text,
+              overviewSource: translationResult.source // 'tmdb', 'auto', ou 'en'
+            };
+          }
+
+          return {
+            ...episode,
+            overviewSource: 'en'
+          };
+        } catch (error) {
+          console.error(`❌ Erreur traduction S${episode.season}E${episode.episode}:`, error.message);
+          return {
+            ...episode,
+            overviewSource: 'en'
+          };
+        }
+      })
+    );
+
+    enrichedEpisodes.push(...enrichedBatch);
+  }
+
+  console.log(`✅ Enrichissement terminé: ${enrichedEpisodes.length} épisodes`);
+  return enrichedEpisodes;
 };
 
 // Obtenir le calendrier complet pour une période
@@ -177,6 +231,7 @@ export const getShowDetails = async (showId) => {
 export default {
   searchShows,
   getShowEpisodes,
+  enrichEpisodesWithTranslations,
   getSchedule,
   getFullSchedule,
   getShowDetails

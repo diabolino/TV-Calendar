@@ -145,14 +145,57 @@ export const getShowOverviewFR = async (showName, imdbId = null) => {
 };
 
 /**
- * Obtenir le synopsis français d'un épisode
+ * Obtenir le synopsis français d'un épisode avec traduction automatique en fallback
  */
-export const getEpisodeOverviewFR = async (tmdbShowId, season, episode) => {
+export const getEpisodeOverviewFR = async (tmdbShowId, season, episode, originalOverview = '') => {
   try {
+    // Étape 1 : Récupérer le synopsis TMDB en français
     const episodeDetails = await getEpisodeDetailsTMDB(tmdbShowId, season, episode);
-    return episodeDetails?.overview || null;
+    const tmdbOverviewFR = episodeDetails?.overview || '';
+
+    // Si on a un synopsis français TMDB non vide, le retourner
+    if (tmdbOverviewFR && tmdbOverviewFR.trim().length > 0) {
+      console.log(`✅ Synopsis FR TMDB trouvé pour S${season}E${episode}`);
+      return {
+        text: tmdbOverviewFR,
+        source: 'tmdb' // 🇫🇷 Traduction officielle TMDB
+      };
+    }
+
+    // Étape 2 : Si pas de synopsis TMDB français, essayer traduction automatique
+    if (originalOverview && originalOverview.trim().length > 0) {
+      console.log(`🤖 Traduction automatique pour S${season}E${episode}`);
+      const { translateToFrench } = await import('./translator.js');
+      const translatedText = await translateToFrench(originalOverview);
+
+      if (translatedText && translatedText.trim().length > 0) {
+        console.log(`✅ Traduction auto réussie pour S${season}E${episode}`);
+        return {
+          text: translatedText,
+          source: 'auto' // 🤖 Traduction automatique
+        };
+      }
+    }
+
+    // Étape 3 : Fallback sur l'anglais original
+    if (originalOverview && originalOverview.trim().length > 0) {
+      console.log(`⚠️ Fallback EN pour S${season}E${episode}`);
+      return {
+        text: originalOverview,
+        source: 'en' // 🇬🇧 Anglais original
+      };
+    }
+
+    return null;
   } catch (error) {
     console.error('❌ Erreur récupération synopsis épisode FR:', error.message);
+    // En cas d'erreur, retourner l'original
+    if (originalOverview) {
+      return {
+        text: originalOverview,
+        source: 'en'
+      };
+    }
     return null;
   }
 };

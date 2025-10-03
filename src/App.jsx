@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv } from 'lucide-react';
-import { searchShows, getShowEpisodes } from './services/tvmaze';
+import { searchShows, getShowEpisodes, enrichEpisodesWithTranslations } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast, getEnrichedShowDetails } from './services/tmdb';
 import { useTheme } from './contexts/ThemeContext';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -34,7 +34,8 @@ import {
 import {
   cacheEpisodes,
   getCachedEpisodes,
-  cleanExpiredCache
+  cleanExpiredCache,
+  deleteFromCache
 } from './services/episodeCache';
 
 const App = () => {
@@ -274,6 +275,12 @@ const App = () => {
         if (!episodes || episodes.length === 0 || forceReload) {
           try {
             episodes = await getShowEpisodes(show.tvmazeId);
+
+            // Enrichir avec les traductions françaises si tmdbId disponible
+            if (show.tmdbId) {
+              episodes = await enrichEpisodesWithTranslations(episodes, show.tmdbId);
+            }
+
             // Sauvegarder dans IndexedDB (TTL 7 jours par défaut)
             await cacheEpisodes(show.tvmazeId, episodes);
             console.log('✅', episodes.length, 'épisodes récupérés et mis en cache pour', show.title);
@@ -369,12 +376,36 @@ const App = () => {
     setShowDeleteConfirm(showId);
   }, []);
 
-  const confirmDelete = useCallback(() => {
+  const confirmDelete = useCallback(async () => {
     if (showDeleteConfirm) {
+      // Trouver la série à supprimer
+      const showToDelete = shows.find(s => s.id === showDeleteConfirm);
+
+      if (showToDelete) {
+        // 1. Supprimer le cache IndexedDB des épisodes
+        await deleteFromCache(showToDelete.tvmazeId);
+
+        // 2. Supprimer tous les épisodes vus de cette série du localStorage
+        const episodesToRemove = calendar.filter(ep =>
+          ep.showId === showToDelete.tvmazeId && ep.quality === showToDelete.quality
+        );
+
+        setWatchedEpisodes(prev => {
+          const updated = { ...prev };
+          episodesToRemove.forEach(ep => {
+            delete updated[ep.id];
+          });
+          return updated;
+        });
+
+        console.log(`🗑️ Série "${showToDelete.title}" supprimée avec tous ses épisodes vus`);
+      }
+
+      // 3. Supprimer la série de la liste
       setShows(prev => prev.filter(s => s.id !== showDeleteConfirm));
       setShowDeleteConfirm(null);
     }
-  }, [showDeleteConfirm]);
+  }, [showDeleteConfirm, shows, calendar]);
 
   const cancelDelete = useCallback(() => {
     setShowDeleteConfirm(null);
@@ -1397,7 +1428,22 @@ const App = () => {
                                   }`}>{episode.quality}</span>
                                 </div>
 
-                                {episode.overview && <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{episode.overview}</p>}
+                                {episode.overview && (
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
+                                    {episode.overviewSource && (
+                                      <span className="mr-1" title={
+                                        episode.overviewSource === 'tmdb' ? 'Traduction officielle TMDB' :
+                                        episode.overviewSource === 'auto' ? 'Traduction automatique' :
+                                        'Texte original en anglais'
+                                      }>
+                                        {episode.overviewSource === 'tmdb' ? '🇫🇷' :
+                                         episode.overviewSource === 'auto' ? '✨' :
+                                         '🇬🇧'}
+                                      </span>
+                                    )}
+                                    {episode.overview}
+                                  </p>
+                                )}
 
                                 <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                                   <span>📅 {episode.airDate}</span>
@@ -1488,7 +1534,22 @@ const App = () => {
                                   <h4 className="font-bold text-lg mb-1">
                                     S{String(nextEp.season).padStart(2, '0')}E{String(nextEp.episode).padStart(2, '0')} - {nextEp.title}
                                   </h4>
-                                  {nextEp.overview && <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{nextEp.overview}</p>}
+                                  {nextEp.overview && (
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
+                                      {nextEp.overviewSource && (
+                                        <span className="mr-1" title={
+                                          nextEp.overviewSource === 'tmdb' ? 'Traduction officielle TMDB' :
+                                          nextEp.overviewSource === 'auto' ? 'Traduction automatique' :
+                                          'Texte original en anglais'
+                                        }>
+                                          {nextEp.overviewSource === 'tmdb' ? '🇫🇷' :
+                                           nextEp.overviewSource === 'auto' ? '✨' :
+                                           '🇬🇧'}
+                                        </span>
+                                      )}
+                                      {nextEp.overview}
+                                    </p>
+                                  )}
                                   <span className="text-xs text-gray-500 dark:text-gray-500">📅 {nextEp.airDate}</span>
                                 </div>
                               </div>
@@ -1946,7 +2007,22 @@ const App = () => {
                                         </h5>
                                         {isWatched && <Check className="w-4 h-4 text-green-400 flex-shrink-0 ml-2" />}
                                       </div>
-                                      <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">{episode.overview}</p>
+                                      {episode.overview && (
+                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                          {episode.overviewSource && (
+                                            <span className="mr-1" title={
+                                              episode.overviewSource === 'tmdb' ? 'Traduction officielle TMDB' :
+                                              episode.overviewSource === 'auto' ? 'Traduction automatique' :
+                                              'Texte original en anglais'
+                                            }>
+                                              {episode.overviewSource === 'tmdb' ? '🇫🇷' :
+                                               episode.overviewSource === 'auto' ? '✨' :
+                                               '🇬🇧'}
+                                            </span>
+                                          )}
+                                          {episode.overview}
+                                        </p>
+                                      )}
                                       <div className="flex items-center gap-2 mt-1">
                                         <span className="text-xs text-gray-500 dark:text-gray-500">📅 {episode.airDate}</span>
                                         {isFuture && <span className="text-xs bg-green-600/20 text-green-400 px-2 py-0.5 rounded">À venir</span>}
@@ -2041,7 +2117,20 @@ const App = () => {
                         </div>
 
                         {episode.overview && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{episode.overview}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
+                            {episode.overviewSource && (
+                              <span className="mr-1" title={
+                                episode.overviewSource === 'tmdb' ? 'Traduction officielle TMDB' :
+                                episode.overviewSource === 'auto' ? 'Traduction automatique' :
+                                'Texte original en anglais'
+                              }>
+                                {episode.overviewSource === 'tmdb' ? '🇫🇷' :
+                                 episode.overviewSource === 'auto' ? '✨' :
+                                 '🇬🇧'}
+                              </span>
+                            )}
+                            {episode.overview}
+                          </p>
                         )}
 
                         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
