@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv, Settings } from 'lucide-react';
+import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv, Settings, MoreVertical, HelpCircle } from 'lucide-react';
 import { searchShows, getShowEpisodes, enrichEpisodesWithTranslations } from './services/tvmaze';
 import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast, getEnrichedShowDetails } from './services/tmdb';
 import { getLibreTranslateURL, setLibreTranslateURL } from './services/translator';
@@ -70,6 +70,7 @@ const App = () => {
   const [showAllCast, setShowAllCast] = useState(false); // Afficher tout le casting
   const [showSettings, setShowSettings] = useState(false); // Afficher les paramètres
   const [libreTranslateURL, setLibreTranslateURLState] = useState(''); // URL LibreTranslate
+  const [showDropdownMenu, setShowDropdownMenu] = useState(false); // Menu dropdown
 
   // Charger depuis localStorage
   useEffect(() => {
@@ -94,7 +95,16 @@ const App = () => {
     // Charger l'URL LibreTranslate
     const savedURL = getLibreTranslateURL();
     setLibreTranslateURLState(savedURL);
-  }, []);
+
+    // Fermer le dropdown menu quand on clique ailleurs
+    const handleClickOutside = (e) => {
+      if (showDropdownMenu && !e.target.closest('.dropdown-menu')) {
+        setShowDropdownMenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showDropdownMenu]);
 
   // Sauvegarder dans localStorage ET sync cloud si connecté
   useEffect(() => {
@@ -1016,24 +1026,52 @@ const App = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Paramètres */}
+            <div className="flex items-center gap-1.5">
+              {/* Navigation principale - compacte */}
               <button
-                onClick={() => setShowSettings(true)}
-                className="p-2 rounded-lg bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 transition-all"
-                title="Paramètres"
+                onClick={() => setView('dashboard')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-sm ${
+                  view === 'dashboard' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
+                }`}
               >
-                <Settings className="w-5 h-5" />
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </button>
+              <button
+                onClick={() => setView('calendar')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-sm ${
+                  view === 'calendar' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
+                }`}
+              >
+                <CalendarDays className="w-4 h-4" />
+                Calendrier
+              </button>
+              <button
+                onClick={() => setView('towatch')}
+                className={`px-3 py-1.5 rounded-lg transition-all relative flex items-center gap-1.5 text-sm ${
+                  view === 'towatch' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
+                }`}
+              >
+                <Eye className="w-4 h-4" />
+                À voir
+                {getShowsToWatch().length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {getShowsToWatch().length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setView('shows')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-sm ${
+                  view === 'shows' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
+                }`}
+              >
+                <Tv className="w-4 h-4" />
+                Séries ({shows.length})
               </button>
 
-              {/* Toggle theme */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 transition-all"
-                title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-              >
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
+              {/* Séparateur */}
+              <div className="w-px h-6 bg-gray-300 dark:bg-white/10 mx-1"></div>
 
               {/* Composant Auth & Backup */}
               <AuthAndBackup
@@ -1046,57 +1084,52 @@ const App = () => {
                 isSyncing={isSyncing}
               />
 
-              <button
-                onClick={() => setView('dashboard')}
-                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
-                  view === 'dashboard' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Dashboard
-              </button>
-              <button
-                onClick={() => setView('calendar')}
-                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
-                  view === 'calendar' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-                Calendrier
-              </button>
-              <button
-                onClick={() => setView('towatch')}
-                className={`px-4 py-2 rounded-lg transition-all relative flex items-center gap-2 ${
-                  view === 'towatch' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
-                }`}
-              >
-                <Eye className="w-4 h-4" />
-                À regarder
-                {getShowsToWatch().length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
-                    {getShowsToWatch().length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setView('shows')}
-                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
-                  view === 'shows' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10'
-                }`}
-              >
-                <Tv className="w-4 h-4" />
-                Mes Séries ({shows.length})
-              </button>
+              {/* Menu dropdown */}
+              <div className="relative dropdown-menu">
+                <button
+                  onClick={() => setShowDropdownMenu(!showDropdownMenu)}
+                  className="p-1.5 rounded-lg bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 transition-all"
+                  title="Menu"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
 
-              {/* Aide - Raccourcis clavier */}
-              <button
-                onClick={() => setShowKeyboardHelp(true)}
-                className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 transition-all flex items-center gap-2"
-                title="Raccourcis clavier (Shift + ?)"
-              >
-                <span className="text-lg font-bold">?</span>
-                Aide
-              </button>
+                {/* Dropdown menu */}
+                {showDropdownMenu && (
+                  <div className="absolute right-0 top-full mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-white/10 py-2 min-w-[200px] z-50">
+                    <button
+                      onClick={() => {
+                        setShowSettings(true);
+                        setShowDropdownMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-white/10 transition-all flex items-center gap-3"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Paramètres
+                    </button>
+                    <button
+                      onClick={() => {
+                        toggleTheme();
+                        setShowDropdownMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-white/10 transition-all flex items-center gap-3"
+                    >
+                      {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                      {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowKeyboardHelp(true);
+                        setShowDropdownMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-white/10 transition-all flex items-center gap-3"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      Raccourcis clavier
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

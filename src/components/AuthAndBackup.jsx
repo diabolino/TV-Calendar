@@ -1,21 +1,35 @@
 // src/components/AuthAndBackup.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Cloud, CloudOff, Download, Upload, LogIn, LogOut, User } from 'lucide-react';
 
-const AuthAndBackup = ({ 
-  user, 
-  onSignIn, 
-  onSignOut, 
-  onSync, 
-  onExport, 
+const AuthAndBackup = ({
+  user,
+  onSignIn,
+  onSignOut,
+  onSync,
+  onExport,
   onImport,
-  isSyncing 
+  isSyncing
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const fileInputRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // Fermer le menu quand on clique en dehors
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showMenu && menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false);
+        setShowEmailForm(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -30,28 +44,21 @@ const AuthAndBackup = ({
   };
 
   return (
-    <div className="relative">
-      {/* Bouton principal */}
+    <div className="relative" ref={menuRef}>
+      {/* Bouton principal - Icône seule */}
       <button
         onClick={() => setShowMenu(!showMenu)}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-          user 
-            ? 'bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/50' 
-            : 'bg-white/5 hover:bg-white/10 border border-white/10'
+        className={`p-1.5 rounded-lg transition-all ${
+          user
+            ? 'bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/50'
+            : 'bg-gray-200 dark:bg-white/5 hover:bg-gray-300 dark:hover:bg-white/10 border border-gray-300 dark:border-white/10'
         }`}
+        title={user ? `Connecté: ${user.email}` : 'Hors ligne - Cliquez pour vous connecter'}
       >
         {user ? (
-          <>
-            <Cloud className="w-5 h-5" />
-            <span className="hidden md:inline">
-              {user.email?.split('@')[0]}
-            </span>
-          </>
+          <Cloud className="w-5 h-5" />
         ) : (
-          <>
-            <CloudOff className="w-5 h-5" />
-            <span className="hidden md:inline">Hors ligne</span>
-          </>
+          <CloudOff className="w-5 h-5" />
         )}
       </button>
 
@@ -234,14 +241,6 @@ const AuthAndBackup = ({
             💡 Les données sont automatiquement sauvegardées localement
           </div>
         </div>
-      )}
-
-      {/* Overlay pour fermer le menu */}
-      {showMenu && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowMenu(false)}
-        />
       )}
     </div>
   );
