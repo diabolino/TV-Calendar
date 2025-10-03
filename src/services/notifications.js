@@ -1,5 +1,6 @@
 // Service de notifications desktop pour Tauri
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { parseEpisodeDate } from '../utils/dateHelpers';
 
 // Demander la permission pour les notifications
 export const requestNotificationPermission = async () => {
@@ -71,7 +72,7 @@ export const checkAndNotifyNewEpisodes = async (calendar, lastCheck, watchedEpis
 
     // Trouver les épisodes diffusés depuis le dernier check
     const newEpisodes = calendar.filter(ep => {
-      const airDate = new Date(ep.airDate);
+      const airDate = parseEpisodeDate(ep);
       return airDate > lastCheckDate && airDate <= now && !watchedEpisodes[ep.id];
     });
 
@@ -107,7 +108,7 @@ export const notifyUpcoming24h = async (calendar, watchedEpisodes) => {
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
     const upcoming = calendar.filter(ep => {
-      const airDate = new Date(ep.airDate);
+      const airDate = parseEpisodeDate(ep);
       return airDate > now && airDate <= in24h && !watchedEpisodes[ep.id];
     });
 

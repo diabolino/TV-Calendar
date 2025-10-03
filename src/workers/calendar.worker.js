@@ -1,5 +1,22 @@
 // Web Worker pour les calculs lourds du calendrier
 
+// ===== Date Helpers (copié depuis dateHelpers.js) =====
+const parseEpisodeDate = (episode) => {
+  if (episode.airTime || episode.airstamp) {
+    return new Date(episode.airTime || episode.airstamp);
+  }
+  if (episode.airDate) {
+    const [year, month, day] = episode.airDate.split('-').map(Number);
+    return new Date(year, month - 1, day, 0, 0, 0, 0);
+  }
+  return new Date(NaN);
+};
+
+const compareEpisodesByDate = (a, b) => {
+  return parseEpisodeDate(a) - parseEpisodeDate(b);
+};
+// ===== Fin Date Helpers =====
+
 self.onmessage = function(e) {
   const { type, data } = e.data;
 
@@ -57,15 +74,15 @@ function filterAndSortShows({ shows, calendar, watchedEpisodes, filters }) {
 
   // Fonction helper pour calculer les stats d'une série
   const getShowStats = (show) => {
-    const episodes = calendar.filter(ep => ep.showId === show.tvmazeId);
+    const episodes = calendar.filter(ep => ep.showId === show.tvmazeId && ep.quality === show.quality);
     const watchedCount = episodes.filter(ep => watchedEpisodes[ep.id]).length;
     const totalEpisodes = episodes.length;
     const progress = totalEpisodes > 0 ? Math.round((watchedCount / totalEpisodes) * 100) : 0;
 
     const now = new Date();
     const nextEpisode = episodes
-      .filter(ep => !watchedEpisodes[ep.id] && new Date(ep.airDate) <= now)
-      .sort((a, b) => new Date(a.airDate) - new Date(b.airDate))[0];
+      .filter(ep => !watchedEpisodes[ep.id] && parseEpisodeDate(ep) <= now)
+      .sort(compareEpisodesByDate)[0];
 
     return { progress, nextEpisode, watchedCount, totalEpisodes };
   };
@@ -83,6 +100,34 @@ function filterAndSortShows({ shows, calendar, watchedEpisodes, filters }) {
       if (filterStatus === 'completed' && stats.progress !== 100) return false;
       if (filterStatus === 'watching' && (stats.progress === 0 || stats.progress === 100)) return false;
       if (filterStatus === 'upcoming' && stats.progress !== 0) return false;
+      if (filterStatus === 'backlog') {
+        // Backlog = séries avec épisodes non vus diffusés dans le passé
+        const now = new Date();
+        const hasBacklog = calendar.some(ep =>
+          ep.showId === show.tvmazeId &&
+          ep.quality === show.quality &&
+          !watchedEpisodes[ep.id] &&
+          parseEpisodeDate(ep) < now
+        );
+        if (!hasBacklog) return false;
+      }
+      if (filterStatus === 'hiatus') {
+        // Hiatus = séries sans épisode futur prévu (aucun épisode après aujourd'hui)
+        const now = new Date();
+        const hasFutureEpisodes = calendar.some(ep =>
+          ep.showId === show.tvmazeId &&
+          ep.quality === show.quality &&
+          parseEpisodeDate(ep) > now
+        );
+        if (hasFutureEpisodes) return false;
+        // Et doit avoir au moins un épisode passé (sinon c'est juste vide)
+        const hasPastEpisodes = calendar.some(ep =>
+          ep.showId === show.tvmazeId &&
+          ep.quality === show.quality &&
+          parseEpisodeDate(ep) <= now
+        );
+        if (!hasPastEpisodes) return false;
+      }
     }
     return true;
   });
@@ -106,7 +151,7 @@ function filterAndSortShows({ shows, calendar, watchedEpisodes, filters }) {
       if (!statsA.nextEpisode && !statsB.nextEpisode) return 0;
       if (!statsA.nextEpisode) return 1;
       if (!statsB.nextEpisode) return -1;
-      return new Date(statsA.nextEpisode.airDate) - new Date(statsB.nextEpisode.airDate);
+      return parseEpisodeDate(statsA.nextEpisode) - parseEpisodeDate(statsB.nextEpisode);
     }
     return 0;
   });
@@ -116,7 +161,7 @@ function filterAndSortShows({ shows, calendar, watchedEpisodes, filters }) {
 
 function getEpisodesForMonth({ calendar, year, month }) {
   return calendar.filter(episode => {
-    const date = new Date(episode.airDate);
+    const date = parseEpisodeDate(episode);
     return date.getFullYear() === year && date.getMonth() === month;
   });
 }

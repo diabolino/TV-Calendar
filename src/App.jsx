@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Plus, Check, X, Star, Search, Trash2, ChevronLeft, ChevronRight, List, Grid, RefreshCw, Play, Clock, Sun, Moon, LayoutDashboard, CalendarDays, Eye, Tv } from 'lucide-react';
 import { searchShows, getShowEpisodes } from './services/tvmaze';
-import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast } from './services/tmdb';
+import { getShowOverviewFR, getEpisodeOverviewFR, getShowCast, getEnrichedShowDetails } from './services/tmdb';
 import { useTheme } from './contexts/ThemeContext';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useCalendarWorker } from './hooks/useCalendarWorker';
 import AuthAndBackup from './components/AuthAndBackup';
 import UpdateNotification from './components/UpdateNotification';
 import Dashboard from './components/Dashboard';
@@ -23,11 +24,24 @@ import { exportData, importData } from './services/exportImport';
 import { cleanExpiredImages } from './services/imageCache';
 import { processSyncQueue, addToSyncQueue, hasPendingSync, getPendingSyncCount } from './services/syncQueue';
 import packageJson from '../package.json';
+import {
+  parseEpisodeDate,
+  compareEpisodesByDate,
+  isEpisodeToday,
+  isEpisodeTomorrow,
+  getEpisodeDateString
+} from './utils/dateHelpers';
+import {
+  cacheEpisodes,
+  getCachedEpisodes,
+  cleanExpiredCache
+} from './services/episodeCache';
 
 const App = () => {
   const { theme, toggleTheme } = useTheme();
   const currentVersion = packageJson.version;
   const updateNotificationRef = useRef(null);
+  const { isWorkerReady, filterAndSortShows: filterAndSortShowsWorker } = useCalendarWorker();
   const [shows, setShows] = useState([]);
   const [calendar, setCalendar] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,8 +61,9 @@ const App = () => {
   const [showsSearchQuery, setShowsSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('added'); // 'added', 'progress', 'next', 'name'
   const [filterQuality, setFilterQuality] = useState('all'); // 'all', '720p', '1080p', '4K'
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'watching', 'completed', 'upcoming'
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'watching', 'completed', 'upcoming', 'backlog', 'hiatus'
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [filteredShows, setFilteredShows] = useState([]);
 
   // Charger depuis localStorage
   useEffect(() => {
@@ -138,9 +153,35 @@ const App = () => {
       }
     });
 
+    // Nettoyer le cache d'épisodes expiré
+    cleanExpiredCache().then(count => {
+      if (count > 0) {
+        console.log(`🧹 ${count} cache(s) d'épisodes expiré(s) nettoyé(s)`);
+      }
+    });
+
     // Vérifier les syncs en attente
     setPendingSyncCount(getPendingSyncCount());
   }, []);
+
+  // Utiliser le Web Worker pour filtrer/trier les séries
+  useEffect(() => {
+    if (!isWorkerReady || shows.length === 0) {
+      setFilteredShows(shows);
+      return;
+    }
+
+    const filters = {
+      searchQuery: showsSearchQuery,
+      sortBy,
+      filterQuality,
+      filterStatus
+    };
+
+    filterAndSortShowsWorker(shows, calendar, watchedEpisodes, filters, (result) => {
+      setFilteredShows(result);
+    });
+  }, [shows, calendar, watchedEpisodes, showsSearchQuery, sortBy, filterQuality, filterStatus, isWorkerReady, filterAndSortShowsWorker]);
 
   // Observer l'authentification Firebase + Auto-connexion
   useEffect(() => {
@@ -220,36 +261,33 @@ const App = () => {
       for (const show of shows) {
         console.log('📺 Chargement épisodes pour:', show.title, '(' + show.quality + ')');
 
-        // Vérifier le cache offline d'abord
-        const cacheKey = `episodes_${show.tvmazeId}`;
-        const cachedData = localStorage.getItem(cacheKey);
-        const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
-        const cacheMaxAge = 24 * 60 * 60 * 1000; // 24 heures
-
         let episodes = [];
 
-        // Utiliser le cache si disponible et récent
-        if (cachedData && cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < cacheMaxAge && !forceReload) {
-          episodes = JSON.parse(cachedData);
-          console.log('💾 Épisodes chargés depuis le cache pour', show.title);
-        } else {
-          // Sinon, charger depuis l'API
+        // Essayer le cache IndexedDB d'abord
+        if (!forceReload) {
+          episodes = await getCachedEpisodes(show.tvmazeId);
+        }
+
+        // Si pas de cache ou force reload, charger depuis l'API
+        if (!episodes || episodes.length === 0 || forceReload) {
           try {
             episodes = await getShowEpisodes(show.tvmazeId);
-            // Sauvegarder dans le cache
-            localStorage.setItem(cacheKey, JSON.stringify(episodes));
-            localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
+            // Sauvegarder dans IndexedDB (TTL 7 jours par défaut)
+            await cacheEpisodes(show.tvmazeId, episodes);
             console.log('✅', episodes.length, 'épisodes récupérés et mis en cache pour', show.title);
           } catch (error) {
-            // En cas d'erreur, utiliser le cache même expiré si disponible
-            if (cachedData) {
-              episodes = JSON.parse(cachedData);
-              console.log('⚠️ Utilisation du cache expiré (mode offline) pour', show.title);
+            // En cas d'erreur, tenter de récupérer depuis le cache même expiré
+            const fallbackEpisodes = await getCachedEpisodes(show.tvmazeId);
+            if (fallbackEpisodes && fallbackEpisodes.length > 0) {
+              episodes = fallbackEpisodes;
+              console.log('⚠️ Utilisation du cache (mode offline) pour', show.title);
             } else {
               console.error('❌ Impossible de charger les épisodes pour', show.title);
               continue;
             }
           }
+        } else {
+          console.log('💾 Épisodes chargés depuis IndexedDB pour', show.title);
         }
 
         // Ajouter avec la qualité de la série (tous les épisodes, toutes saisons)
@@ -463,7 +501,7 @@ const App = () => {
   const getShowEpisodesFiltered = (showId, quality) => {
     return calendar
       .filter(ep => ep.showId === showId && ep.quality === quality)
-      .sort((a, b) => new Date(a.airDate) - new Date(b.airDate));
+      .sort(compareEpisodesByDate);
   };
 
   // Générer une couleur unique pour une série (basée sur l'ID)
@@ -541,14 +579,14 @@ const App = () => {
       } else {
         console.log('⚠️ Pas de données TMDB trouvées pour:', show.title);
       }
-    } else if (show.tmdbId && !show.cast) {
-      // Si on a le tmdbId mais pas le cast, le récupérer
-      console.log('📡 Récupération cast pour:', show.title);
-      const cast = await getShowCast(show.tmdbId);
+    } else if (show.tmdbId && !show.enrichedDetails) {
+      // Si on a le tmdbId mais pas les détails enrichis, les récupérer
+      console.log('📡 Récupération détails enrichis pour:', show.title);
+      const enriched = await getEnrichedShowDetails(show.tmdbId);
 
       const updatedShow = {
         ...show,
-        cast: cast
+        enrichedDetails: enriched
       };
 
       const updatedShows = shows.map(s =>
@@ -557,7 +595,7 @@ const App = () => {
       setShows(updatedShows);
       setSelectedShowDetail(updatedShow);
 
-      console.log('✅ Cast récupéré pour:', show.title);
+      console.log('✅ Détails enrichis récupérés pour:', show.title);
     }
   };
 
@@ -583,7 +621,7 @@ const App = () => {
 
     const watchedShowEpisodes = calendar
       .filter(ep => {
-        const epDate = new Date(ep.airDate);
+        const epDate = parseEpisodeDate(ep);
         epDate.setHours(0, 0, 0, 0);
         return ep.showId === showId &&
                ep.quality === quality &&
@@ -614,7 +652,7 @@ const App = () => {
 
     const availableEpisodes = calendar
       .filter(ep => {
-        const epDate = new Date(ep.airDate);
+        const epDate = parseEpisodeDate(ep);
         epDate.setHours(0, 0, 0, 0);
         return ep.showId === showId && ep.quality === quality && epDate <= today;
       })
@@ -637,7 +675,7 @@ const App = () => {
     // Chercher dans la saison en cours
     const seasonEpisodes = calendar
       .filter(ep => {
-        const epDate = new Date(ep.airDate);
+        const epDate = parseEpisodeDate(ep);
         epDate.setHours(0, 0, 0, 0);
         return ep.showId === showId &&
                ep.quality === quality &&
@@ -658,7 +696,7 @@ const App = () => {
       // Chercher uniquement dans les saisons suivantes
       const nextSeasonEpisodes = calendar
         .filter(ep => {
-          const epDate = new Date(ep.airDate);
+          const epDate = parseEpisodeDate(ep);
           epDate.setHours(0, 0, 0, 0);
           return ep.showId === showId &&
                  ep.quality === quality &&
@@ -676,7 +714,7 @@ const App = () => {
     // Sinon (aucun épisode vu dans la saison en cours), chercher dans les saisons précédentes
     const previousSeasonEpisodes = calendar
       .filter(ep => {
-        const epDate = new Date(ep.airDate);
+        const epDate = parseEpisodeDate(ep);
         epDate.setHours(0, 0, 0, 0);
         return ep.showId === showId &&
                ep.quality === quality &&
@@ -717,9 +755,7 @@ const App = () => {
     }).filter(show => show !== null);
 
     return showsWithUnwatched.sort((a, b) => {
-      const dateA = new Date(a.nextEpisode.airDate);
-      const dateB = new Date(b.nextEpisode.airDate);
-      return dateA - dateB;
+      return parseEpisodeDate(a.nextEpisode) - parseEpisodeDate(b.nextEpisode);
     });
   };
 
@@ -859,7 +895,7 @@ const App = () => {
 
   // Filtrer les épisodes du mois courant pour la vue liste
   const currentMonthEpisodes = calendar.filter(ep => {
-    const epDate = new Date(ep.airDate);
+    const epDate = parseEpisodeDate(ep);
     return epDate.getMonth() === currentDate.getMonth() && epDate.getFullYear() === currentDate.getFullYear();
   });
   const groupedEpisodes = groupByDate(currentMonthEpisodes);
@@ -1083,7 +1119,7 @@ const App = () => {
             onShowClick={openShowDetails}
             onEpisodeClick={(episode) => {
               const dayEpisodes = calendar.filter(ep => ep.airDate === episode.airDate);
-              setSelectedDayEpisodes({ date: new Date(episode.airDate), episodes: dayEpisodes });
+              setSelectedDayEpisodes({ date: parseEpisodeDate(episode), episodes: dayEpisodes });
             }}
           />
         ) : view === 'calendar' ? (
@@ -1552,6 +1588,8 @@ const App = () => {
                     <option value="watching">En cours</option>
                     <option value="completed">Terminées</option>
                     <option value="upcoming">À venir</option>
+                    <option value="backlog">En retard</option>
+                    <option value="hiatus">En pause</option>
                   </select>
 
                   {/* Reset */}
@@ -1580,48 +1618,7 @@ const App = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-8 gap-4">
-                {shows
-                  .filter(show => {
-                    // Filtre recherche
-                    if (showsSearchQuery && !show.title.toLowerCase().includes(showsSearchQuery.toLowerCase())) {
-                      return false;
-                    }
-                    // Filtre qualité
-                    if (filterQuality !== 'all' && show.quality !== filterQuality) {
-                      return false;
-                    }
-                    // Filtre statut
-                    if (filterStatus !== 'all') {
-                      const stats = getShowStats(show.tvmazeId, show.quality);
-                      if (filterStatus === 'completed' && stats.progress !== 100) return false;
-                      if (filterStatus === 'watching' && (stats.progress === 0 || stats.progress === 100)) return false;
-                      if (filterStatus === 'upcoming' && stats.progress !== 0) return false;
-                    }
-                    return true;
-                  })
-                  .sort((a, b) => {
-                    if (sortBy === 'added') {
-                      return new Date(b.addedAt) - new Date(a.addedAt);
-                    }
-                    if (sortBy === 'name') {
-                      return a.title.localeCompare(b.title);
-                    }
-                    if (sortBy === 'progress') {
-                      const statsA = getShowStats(a.tvmazeId, a.quality);
-                      const statsB = getShowStats(b.tvmazeId, b.quality);
-                      return statsB.progress - statsA.progress;
-                    }
-                    if (sortBy === 'next') {
-                      const statsA = getShowStats(a.tvmazeId, a.quality);
-                      const statsB = getShowStats(b.tvmazeId, b.quality);
-                      if (!statsA.nextEpisode && !statsB.nextEpisode) return 0;
-                      if (!statsA.nextEpisode) return 1;
-                      if (!statsB.nextEpisode) return -1;
-                      return new Date(statsA.nextEpisode.airDate) - new Date(statsB.nextEpisode.airDate);
-                    }
-                    return 0;
-                  })
-                  .map(show => {
+                {filteredShows.map(show => {
                     const stats = getShowStats(show.tvmazeId, show.quality);
                     return (
                       <ShowCard
@@ -1684,12 +1681,103 @@ const App = () => {
                 </div>
               )}
 
+              {/* Informations série */}
+              {selectedShowDetail.enrichedDetails && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-100 dark:bg-white/5 rounded-xl p-4 border border-gray-300 dark:border-white/10">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Statut</p>
+                    <p className="font-bold">{selectedShowDetail.enrichedDetails.status}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Type</p>
+                    <p className="font-bold">{selectedShowDetail.enrichedDetails.type}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Saisons</p>
+                    <p className="font-bold">{selectedShowDetail.enrichedDetails.numberOfSeasons}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Épisodes</p>
+                    <p className="font-bold">{selectedShowDetail.enrichedDetails.numberOfEpisodes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Genres et réseaux */}
+              {selectedShowDetail.enrichedDetails && (
+                <div className="space-y-3">
+                  {selectedShowDetail.enrichedDetails.genres.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Genres</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedShowDetail.enrichedDetails.genres.map(genre => (
+                          <span key={genre} className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-sm font-semibold">
+                            {genre}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedShowDetail.enrichedDetails.networks.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Réseaux</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedShowDetail.enrichedDetails.networks.map(network => (
+                          <span key={network} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm font-semibold">
+                            {network}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Liens externes */}
+              {selectedShowDetail.enrichedDetails?.externalIds && (
+                <div>
+                  <h3 className="text-xl font-bold mb-3 text-purple-400">Liens externes</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {selectedShowDetail.enrichedDetails.externalIds.imdbId && (
+                      <a
+                        href={`https://www.imdb.com/title/${selectedShowDetail.enrichedDetails.externalIds.imdbId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-lg font-semibold hover:bg-yellow-500/30 transition-all"
+                      >
+                        IMDb
+                      </a>
+                    )}
+                    {selectedShowDetail.enrichedDetails.homepage && (
+                      <a
+                        href={selectedShowDetail.enrichedDetails.homepage}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg font-semibold hover:bg-green-500/30 transition-all"
+                      >
+                        Site officiel
+                      </a>
+                    )}
+                    {selectedShowDetail.enrichedDetails.externalIds.tvdbId && (
+                      <a
+                        href={`https://www.thetvdb.com/?tab=series&id=${selectedShowDetail.enrichedDetails.externalIds.tvdbId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg font-semibold hover:bg-blue-500/30 transition-all"
+                      >
+                        TheTVDB
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Acteurs principaux */}
-              {selectedShowDetail.cast && selectedShowDetail.cast.length > 0 && (
+              {(selectedShowDetail.cast?.length > 0 || selectedShowDetail.enrichedDetails?.cast?.length > 0) && (
                 <div>
                   <h3 className="text-xl font-bold mb-4 text-purple-400">Acteurs principaux</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {selectedShowDetail.cast.map(actor => (
+                    {(selectedShowDetail.enrichedDetails?.cast || selectedShowDetail.cast || []).map(actor => (
                       <div key={actor.id} className="bg-gray-100 dark:bg-white/5 rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 hover:border-purple-500/50 transition-all">
                         <CachedImage
                           src={actor.profilePath || 'https://via.placeholder.com/185x278/1a1a1a/ffffff?text=No+Photo'}

@@ -1,6 +1,16 @@
 import React, { useMemo } from 'react';
 import { TrendingUp, Clock, CheckCircle, Calendar, Play, Bell, Eye, Target } from 'lucide-react';
 import CachedImage from './CachedImage';
+import {
+  parseEpisodeDate,
+  compareEpisodesByDate,
+  isEpisodeToday,
+  isEpisodeTomorrow,
+  getEpisodeDateString,
+  getEpisodesAiredBefore,
+  getEpisodesAiredAfter,
+  getEpisodesInRange
+} from '../utils/dateHelpers';
 
 const Dashboard = ({ shows, calendar, watchedEpisodes, onShowClick, onEpisodeClick }) => {
   // Calculer les statistiques
@@ -15,8 +25,7 @@ const Dashboard = ({ shows, calendar, watchedEpisodes, onShowClick, onEpisodeCli
     // Épisodes à regarder (passés et non vus)
     const now = new Date();
     const toWatch = calendar.filter(ep => {
-      const airDate = new Date(ep.airDate);
-      return airDate < now && !watchedEpisodes[ep.id];
+      return parseEpisodeDate(ep) < now && !watchedEpisodes[ep.id];
     }).length;
 
     // Séries terminées (100% vus)
@@ -40,10 +49,7 @@ const Dashboard = ({ shows, calendar, watchedEpisodes, onShowClick, onEpisodeCli
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
 
-    const episodesThisWeek = calendar.filter(ep => {
-      const airDate = new Date(ep.airDate);
-      return airDate >= weekStart && airDate < weekEnd;
-    }).length;
+    const episodesThisWeek = getEpisodesInRange(calendar, weekStart, weekEnd).length;
 
     return {
       totalEpisodes,
@@ -70,14 +76,14 @@ const Dashboard = ({ shows, calendar, watchedEpisodes, onShowClick, onEpisodeCli
     const in7days = new Date(now);
     in7days.setDate(in7days.getDate() + 7);
 
-    const upcoming = calendar
-      .filter(ep => new Date(ep.airDate) > now && !watchedEpisodes[ep.id])
-      .sort((a, b) => new Date(a.airDate) - new Date(b.airDate));
+    const upcoming = getEpisodesAiredAfter(calendar, now)
+      .filter(ep => !watchedEpisodes[ep.id])
+      .sort(compareEpisodesByDate);
 
     return {
-      next24h: upcoming.filter(ep => new Date(ep.airDate) <= in24h),
-      next48h: upcoming.filter(ep => new Date(ep.airDate) > in24h && new Date(ep.airDate) <= in48h),
-      next7days: upcoming.filter(ep => new Date(ep.airDate) > in48h && new Date(ep.airDate) <= in7days)
+      next24h: upcoming.filter(ep => parseEpisodeDate(ep) <= in24h),
+      next48h: upcoming.filter(ep => parseEpisodeDate(ep) > in24h && parseEpisodeDate(ep) <= in48h),
+      next7days: upcoming.filter(ep => parseEpisodeDate(ep) > in48h && parseEpisodeDate(ep) <= in7days)
     };
   }, [calendar, watchedEpisodes]);
 
@@ -98,9 +104,8 @@ const Dashboard = ({ shows, calendar, watchedEpisodes, onShowClick, onEpisodeCli
 
   const EpisodeCard = ({ episode, showBadge }) => {
     const show = shows.find(s => s.tvmazeId === episode.showId && s.quality === episode.quality);
-    const airDate = new Date(episode.airDate);
-    const isToday = airDate.toDateString() === new Date().toDateString();
-    const isTomorrow = airDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
+    const isToday = isEpisodeToday(episode);
+    const isTomorrow = isEpisodeTomorrow(episode);
 
     return (
       <div
@@ -128,7 +133,7 @@ const Dashboard = ({ shows, calendar, watchedEpisodes, onShowClick, onEpisodeCli
                   isTomorrow ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400' :
                   'bg-blue-500/20 text-blue-600 dark:text-blue-400'
                 }`}>
-                  {isToday ? "Aujourd'hui" : isTomorrow ? 'Demain' : episode.airDate}
+                  {isToday ? "Aujourd'hui" : isTomorrow ? 'Demain' : getEpisodeDateString(episode)}
                 </span>
               )}
               {show && (

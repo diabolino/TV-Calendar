@@ -164,8 +164,8 @@ export const getShowCast = async (tmdbShowId) => {
   try {
     const response = await tmdbApi.get(`/tv/${tmdbShowId}/credits`);
 
-    // Retourner les 5 premiers acteurs principaux
-    const cast = response.data.cast.slice(0, 5).map(actor => ({
+    // Retourner les 10 premiers acteurs principaux
+    const cast = response.data.cast.slice(0, 10).map(actor => ({
       id: actor.id,
       name: actor.name,
       character: actor.character,
@@ -182,6 +182,68 @@ export const getShowCast = async (tmdbShowId) => {
   }
 };
 
+/**
+ * Obtenir tous les détails enrichis d'une série (saisons, épisodes, liens)
+ */
+export const getEnrichedShowDetails = async (tmdbShowId) => {
+  try {
+    const [details, externalIds, cast] = await Promise.all([
+      tmdbApi.get(`/tv/${tmdbShowId}`),
+      tmdbApi.get(`/tv/${tmdbShowId}/external_ids`),
+      getShowCast(tmdbShowId)
+    ]);
+
+    const show = details.data;
+    const external = externalIds.data;
+
+    return {
+      tmdbId: show.id,
+      name: show.name,
+      overview: show.overview || '',
+      firstAirDate: show.first_air_date,
+      lastAirDate: show.last_air_date,
+      status: show.status,
+      numberOfSeasons: show.number_of_seasons,
+      numberOfEpisodes: show.number_of_episodes,
+      type: show.type,
+      genres: show.genres.map(g => g.name),
+      networks: show.networks.map(n => n.name),
+      productionCountries: show.production_countries.map(c => c.iso_3166_1),
+      seasons: show.seasons.map(s => ({
+        id: s.id,
+        seasonNumber: s.season_number,
+        name: s.name,
+        episodeCount: s.episode_count,
+        airDate: s.air_date,
+        overview: s.overview || '',
+        posterPath: s.poster_path
+          ? `https://image.tmdb.org/t/p/w300${s.poster_path}`
+          : null
+      })),
+      externalIds: {
+        imdbId: external.imdb_id,
+        tvdbId: external.tvdb_id,
+        facebookId: external.facebook_id,
+        instagramId: external.instagram_id,
+        twitterId: external.twitter_id
+      },
+      cast,
+      homepage: show.homepage,
+      backdrop: show.backdrop_path
+        ? `https://image.tmdb.org/t/p/original${show.backdrop_path}`
+        : null,
+      poster: show.poster_path
+        ? `https://image.tmdb.org/t/p/original${show.poster_path}`
+        : null,
+      voteAverage: show.vote_average,
+      voteCount: show.vote_count
+    };
+  } catch (error) {
+    console.error('❌ Erreur détails enrichis série:', error.message);
+    return null;
+  }
+};
+
 export default {
   searchShowTMDB,
   getShowDetailsTMDB,
@@ -189,5 +251,6 @@ export default {
   findShowByIMDB,
   getShowOverviewFR,
   getEpisodeOverviewFR,
-  getShowCast
+  getShowCast,
+  getEnrichedShowDetails
 };
