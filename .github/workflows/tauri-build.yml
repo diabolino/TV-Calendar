@@ -84,15 +84,24 @@ jobs:
           NEW_NAME="TVCalendar_${VERSION}_aarch64.app.tar.gz"
 
           if [ -f "${BUNDLE_PATH}/${OLD_NAME}" ]; then
-            echo "Found ${OLD_NAME}, renaming to ${NEW_NAME}"
+            echo "Found ${OLD_NAME}, processing..."
 
-            # Supprimer l'ancien fichier de la release
-            gh release delete-asset ${{ github.ref_name }} "${OLD_NAME}" -y || true
-
-            # Renommer le fichier
+            # Renommer le fichier localement
             mv "${BUNDLE_PATH}/${OLD_NAME}" "${BUNDLE_PATH}/${NEW_NAME}"
+            echo "Renamed to ${NEW_NAME}"
+
+            # Attendre un peu pour que la release soit complètement créée
+            sleep 5
+
+            # Supprimer l'ancien fichier de la release (si existe)
+            echo "Deleting old asset ${OLD_NAME} from release..."
+            gh release delete-asset ${{ github.ref_name }} "${OLD_NAME}" -y 2>/dev/null || echo "Old asset not found or already deleted"
 
             # Uploader le nouveau fichier vers la release
+            echo "Uploading ${NEW_NAME}..."
             gh release upload ${{ github.ref_name }} "${BUNDLE_PATH}/${NEW_NAME}"
             echo "Successfully uploaded ${NEW_NAME}"
+          else
+            echo "File ${BUNDLE_PATH}/${OLD_NAME} not found!"
+            ls -la "${BUNDLE_PATH}/"
           fi
