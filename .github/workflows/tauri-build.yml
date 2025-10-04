@@ -80,14 +80,19 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           BUNDLE_PATH="src-tauri/target/release/bundle/macos"
+          OLD_NAME="TVCalendar_aarch64.app.tar.gz"
+          NEW_NAME="TVCalendar_${VERSION}_aarch64.app.tar.gz"
 
-          if [ -f "${BUNDLE_PATH}/TVCalendar_aarch64.app.tar.gz" ]; then
+          if [ -f "${BUNDLE_PATH}/${OLD_NAME}" ]; then
+            echo "Found ${OLD_NAME}, renaming to ${NEW_NAME}"
+
+            # Supprimer l'ancien fichier de la release
+            gh release delete-asset ${{ github.ref_name }} "${OLD_NAME}" -y || true
+
             # Renommer le fichier
-            NEW_NAME="TVCalendar_${VERSION}_aarch64.app.tar.gz"
-            mv "${BUNDLE_PATH}/TVCalendar_aarch64.app.tar.gz" "${BUNDLE_PATH}/${NEW_NAME}"
-            echo "Renamed to ${NEW_NAME}"
+            mv "${BUNDLE_PATH}/${OLD_NAME}" "${BUNDLE_PATH}/${NEW_NAME}"
 
-            # Uploader vers la release
-            gh release upload ${{ github.ref_name }} "${BUNDLE_PATH}/${NEW_NAME}" --clobber
-            echo "Uploaded ${NEW_NAME} to release"
+            # Uploader le nouveau fichier vers la release
+            gh release upload ${{ github.ref_name }} "${BUNDLE_PATH}/${NEW_NAME}"
+            echo "Successfully uploaded ${NEW_NAME}"
           fi
