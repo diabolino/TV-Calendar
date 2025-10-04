@@ -58,7 +58,9 @@ jobs:
           echo "VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}" >> .env
           echo "VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}" >> .env
 
-      - uses: tauri-apps/tauri-action@v0.5.23
+      - name: Build with Tauri
+        uses: tauri-apps/tauri-action@v0.5.23
+        id: tauri-build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -69,3 +71,23 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: false
+
+      # Renommer le fichier .app.tar.gz pour inclure la version (macOS uniquement)
+      - name: Rename and re-upload macOS app bundle
+        if: matrix.platform == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          BUNDLE_PATH="src-tauri/target/release/bundle/macos"
+
+          if [ -f "${BUNDLE_PATH}/TVCalendar_aarch64.app.tar.gz" ]; then
+            # Renommer le fichier
+            NEW_NAME="TVCalendar_${VERSION}_aarch64.app.tar.gz"
+            mv "${BUNDLE_PATH}/TVCalendar_aarch64.app.tar.gz" "${BUNDLE_PATH}/${NEW_NAME}"
+            echo "Renamed to ${NEW_NAME}"
+
+            # Uploader vers la release
+            gh release upload ${{ github.ref_name }} "${BUNDLE_PATH}/${NEW_NAME}" --clobber
+            echo "Uploaded ${NEW_NAME} to release"
+          fi
