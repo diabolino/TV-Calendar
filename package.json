@@ -1,6 +1,6 @@
 {
   "name": "tv-calendar",
-  "version": "3.0.11",
+  "version": "3.0.12",
   "description": "Application de calendrier TV moderne (Tauri)",
   "type": "module",
   "scripts": {

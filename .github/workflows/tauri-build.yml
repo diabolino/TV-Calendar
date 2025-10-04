@@ -80,7 +80,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           BUNDLE_PATH="src-tauri/target/release/bundle/macos"
-          OLD_NAME="TVCalendar_aarch64.app.tar.gz"
+          OLD_NAME="TVCalendar.app.tar.gz"
           NEW_NAME="TVCalendar_${VERSION}_aarch64.app.tar.gz"
 
           if [ -f "${BUNDLE_PATH}/${OLD_NAME}" ]; then
@@ -93,9 +93,10 @@ jobs:
             # Attendre un peu pour que la release soit complètement créée
             sleep 5
 
-            # Supprimer l'ancien fichier de la release (si existe)
-            echo "Deleting old asset ${OLD_NAME} from release..."
-            gh release delete-asset ${{ github.ref_name }} "${OLD_NAME}" -y 2>/dev/null || echo "Old asset not found or already deleted"
+            # Supprimer les anciens fichiers de la release (si existent)
+            echo "Deleting old assets from release..."
+            gh release delete-asset ${{ github.ref_name }} "TVCalendar_aarch64.app.tar.gz" -y 2>/dev/null || echo "TVCalendar_aarch64.app.tar.gz not found"
+            gh release delete-asset ${{ github.ref_name }} "${OLD_NAME}" -y 2>/dev/null || echo "${OLD_NAME} not found"
 
             # Uploader le nouveau fichier vers la release
             echo "Uploading ${NEW_NAME}..."
