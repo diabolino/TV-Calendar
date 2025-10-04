@@ -1,6 +1,7 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { check } from '@tauri-apps/plugin-updater';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import axios from 'axios';
+import packageJson from '../../package.json';
 
 const UpdateNotification = forwardRef((props, ref) => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -13,19 +14,49 @@ const UpdateNotification = forwardRef((props, ref) => {
 
   const checkForUpdates = async (isManual = false) => {
     try {
-      const update = await check();
-      if (update?.available) {
+      // Récupérer le package.json depuis GitHub
+      const response = await axios.get(
+        'https://raw.githubusercontent.com/diabolino/TV-Calendar/refs/heads/main/package.json',
+        { timeout: 5000 }
+      );
+
+      const latestVersion = response.data.version;
+      const currentVersion = packageJson.version;
+
+      console.log(`Version actuelle: ${currentVersion}, Dernière version: ${latestVersion}`);
+
+      // Comparer les versions
+      if (isNewerVersion(latestVersion, currentVersion)) {
         setUpdateAvailable(true);
-        setUpdateInfo(update);
-        console.log('Update available:', update.version);
+        setUpdateInfo({
+          version: latestVersion,
+          currentVersion: currentVersion
+        });
+        console.log('Mise à jour disponible:', latestVersion);
       } else if (isManual) {
         // Afficher le message "Vous êtes à jour" seulement si vérification manuelle
         setShowNoUpdateMessage(true);
         setTimeout(() => setShowNoUpdateMessage(false), 5000);
       }
     } catch (error) {
-      console.error('Error checking for updates:', error);
+      console.error('Erreur lors de la vérification des mises à jour:', error);
+      if (isManual) {
+        // En cas d'erreur, informer l'utilisateur
+        alert('Impossible de vérifier les mises à jour. Vérifiez votre connexion internet.');
+      }
     }
+  };
+
+  // Comparer deux versions (format: X.Y.Z)
+  const isNewerVersion = (latest, current) => {
+    const latestParts = latest.split('.').map(Number);
+    const currentParts = current.split('.').map(Number);
+
+    for (let i = 0; i < 3; i++) {
+      if (latestParts[i] > currentParts[i]) return true;
+      if (latestParts[i] < currentParts[i]) return false;
+    }
+    return false;
   };
 
   // Exposer la fonction checkForUpdates au parent via ref
@@ -38,7 +69,7 @@ const UpdateNotification = forwardRef((props, ref) => {
       // Ouvrir la page des releases GitHub
       await openUrl(`https://github.com/diabolino/TV-Calendar/releases/tag/v${updateInfo.version}`);
     } catch (error) {
-      console.error('Error opening release page:', error);
+      console.error('Erreur lors de l\'ouverture de la page de release:', error);
     }
   };
 
@@ -49,7 +80,9 @@ const UpdateNotification = forwardRef((props, ref) => {
           <div className="flex items-start justify-between mb-2">
             <div>
               <h3 className="font-bold text-lg">Mise à jour disponible</h3>
-              <p className="text-sm opacity-90">Version {updateInfo?.version}</p>
+              <p className="text-sm opacity-90">
+                Version {updateInfo?.version} (actuelle: {updateInfo?.currentVersion})
+              </p>
             </div>
             <button
               onClick={() => setUpdateAvailable(false)}
@@ -59,9 +92,9 @@ const UpdateNotification = forwardRef((props, ref) => {
             </button>
           </div>
 
-          {updateInfo?.body && (
-            <p className="text-sm mb-3 opacity-90">{updateInfo.body}</p>
-          )}
+          <p className="text-sm mb-3 opacity-90">
+            Une nouvelle version est disponible sur GitHub !
+          </p>
 
           <div className="flex gap-2">
             <button
