@@ -41,7 +41,7 @@ Application de calendrier TV moderne et légère, construite avec **Tauri** + Re
 ### 🔧 Corrections importantes
 - Fix timezone robuste (UTC via airstamp)
 - Suppression complète des séries (cache + historique)
-- Auto-updater fonctionnel avec notifications
+- Système de vérification de version simplifié (sans signatures)
 
 ## 🚀 Fonctionnalités principales
 
@@ -58,9 +58,9 @@ Application de calendrier TV moderne et légère, construite avec **Tauri** + Re
 
 Téléchargez la dernière version depuis [Releases](https://github.com/diabolino/TV-Calendar/releases)
 
-- **Windows** : `.exe` (installer NSIS) ou `.msi` - [📖 Guide d'installation](WINDOWS_INSTALL.md)
-- **macOS** : `.dmg` - [📖 Guide d'installation](MACOS_INSTALL.md)
-- **Linux** : `.AppImage` ou `.deb`
+- **Windows** : `TVCalendar_VERSION_x64-setup.exe` - [📖 Guide d'installation](WINDOWS_INSTALL.md)
+- **macOS** : `TVCalendar_VERSION_aarch64.dmg` ou `.app.tar.gz` - [📖 Guide d'installation](MACOS_INSTALL.md)
+- **Linux** : `TVCalendar_VERSION_amd64.AppImage` ou `.deb`
 
 > ⚠️ **Note** : L'application n'est pas signée numériquement. Windows et macOS afficheront un avertissement de sécurité (c'est normal). Consultez les guides d'installation ci-dessus.
 

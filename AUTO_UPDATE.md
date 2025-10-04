@@ -1,86 +1,72 @@
-# Auto-Update Documentation
+# Système de Mise à Jour
 
-## Configuration
+## Vue d'ensemble
 
-L'auto-update est configuré via le plugin Tauri Updater.
+Depuis la version 3.0.7, TV Calendar utilise un **système de vérification de version simplifié** sans signatures ni fichiers `.sig`.
 
-### Configuration actuelle
+## Comment ça fonctionne
 
-- **Endpoint**: `https://github.com/diabolino/TV-Calendar/releases/latest/download/latest.json`
-- **Vérification**: Au démarrage de l'application
-- **Signature**: Non configurée (pubkey vide)
+### Vérification automatique
 
-### Fonctionnement
-
-1. **Vérification automatique**: L'application vérifie les mises à jour au démarrage
-2. **Notification**: Si une mise à jour est disponible, une notification apparaît en bas à droite
-3. **Installation**: L'utilisateur peut choisir d'installer immédiatement ou plus tard
-4. **Redémarrage**: Après installation, l'application redémarre automatiquement
+1. **Au démarrage**: L'application vérifie automatiquement les mises à jour
+2. **Comparaison**: Compare la version locale avec `package.json` sur GitHub
+3. **Notification**: Si une nouvelle version existe, affiche une notification en bas à droite
+4. **Action manuelle**: L'utilisateur télécharge manuellement depuis GitHub Releases
 
 ### Composants
 
-- **Backend**: Plugin `tauri-plugin-updater` dans `src-tauri/src/lib.rs`
-- **Frontend**: Composant `UpdateNotification.jsx`
-- **Configuration**: `src-tauri/tauri.conf.json`
+- **Frontend**: [src/components/UpdateNotification.jsx](src/components/UpdateNotification.jsx)
+- **Endpoint**: `https://raw.githubusercontent.com/diabolino/TV-Calendar/refs/heads/main/package.json`
+- **Pas de backend Tauri** : Le plugin `tauri-plugin-updater` a été supprimé
 
 ### GitHub Actions
 
-Le workflow `.github/workflows/tauri-build.yml` génère automatiquement:
-- Les fichiers binaires pour chaque plateforme
-- Le fichier `latest.json` requis pour l'updater
-- La release GitHub avec tous les assets
+Le workflow [.github/workflows/tauri-build.yml](.github/workflows/tauri-build.yml) génère automatiquement:
+- ✅ Fichiers binaires pour chaque plateforme (DMG, EXE, AppImage, DEB)
+- ✅ Release GitHub avec assets
+- ❌ ~~Pas de fichier `latest.json`~~ (supprimé)
+- ❌ ~~Pas de fichiers `.sig`~~ (supprimé)
 
-### Notes de sécurité
+## Pourquoi ce changement ?
 
-⚠️ **Actuellement, la signature des mises à jour n'est pas activée** (`pubkey` est vide).
+**Avantages du système actuel :**
+- ✅ Pas de complexité de signatures cryptographiques
+- ✅ Pas de gestion de clés privées
+- ✅ Builds plus rapides (pas de génération de `.sig`)
+- ✅ Notification visible pour l'utilisateur
+- ✅ Contrôle total sur le téléchargement
 
-Pour activer la signature:
+**Inconvénients :**
+- ⚠️ L'utilisateur doit télécharger et installer manuellement
+- ⚠️ Pas de vérification cryptographique de l'intégrité
 
-1. Générer une keypair:
-```bash
-npm run tauri signer generate -w ~/.tauri/tvcalendar.key
+## Vérification manuelle
+
+L'utilisateur peut également vérifier manuellement :
+1. Cliquer sur le bouton "Vérifier les mises à jour" dans la notification
+2. Si une mise à jour existe → bouton "Télécharger" ouvre GitHub Releases
+3. Télécharger et installer la nouvelle version
+
+## Fichiers supprimés (V3.0.7+)
+
+Ces fichiers/configurations ont été supprimés :
+- ❌ `tauri-plugin-updater` (Cargo.toml, lib.rs)
+- ❌ Section `plugins.updater` (tauri.conf.json)
+- ❌ Fichiers `.sig` (plus générés)
+- ❌ `latest.json` (plus généré)
+- ❌ Secret `TAURI_SIGNING_PRIVATE_KEY` (GitHub Actions)
+
+## Migration depuis V2.x
+
+Si vous utilisez une ancienne version avec l'auto-updater Tauri :
+1. La notification de mise à jour vous informera de la V3
+2. Téléchargez manuellement depuis GitHub Releases
+3. Installez la nouvelle version
+4. Le nouveau système sera actif automatiquement
+
+## Désactivation
+
+Pour désactiver les notifications de mise à jour, commentez cette ligne dans [src/App.jsx](src/App.jsx) :
+```javascript
+// <UpdateNotification />
 ```
-
-2. Copier la clé publique dans `tauri.conf.json`:
-```json
-{
-  "plugins": {
-    "updater": {
-      "pubkey": "VOTRE_CLE_PUBLIQUE_ICI"
-    }
-  }
-}
-```
-
-3. Ajouter la clé privée comme secret GitHub:
-   - Aller dans Settings → Secrets → Actions
-   - Créer un nouveau secret `TAURI_PRIVATE_KEY`
-   - Coller le contenu de `~/.tauri/tvcalendar.key`
-
-4. Mettre à jour le workflow pour signer:
-```yaml
-- uses: tauri-apps/tauri-action@v0
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-```
-
-### Test en local
-
-Pour tester l'auto-update localement:
-
-1. Compiler une version avec un numéro inférieur:
-```bash
-# Modifier version dans package.json et tauri.conf.json
-npm run tauri:build
-```
-
-2. Installer cette version
-
-3. Créer une nouvelle release sur GitHub avec un numéro supérieur
-
-4. Lancer l'application installée → devrait détecter la mise à jour
-
-### Désactivation
-
-Pour désactiver l'auto-update, retirer le composant `<UpdateNotification />` de `App.jsx`.
